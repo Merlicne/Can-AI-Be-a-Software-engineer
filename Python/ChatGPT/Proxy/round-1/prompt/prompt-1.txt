@@ -1,0 +1,36 @@
+Create a simple CRUD API in Python using Flask as the web framework. The API should allow for creating, reading, updating, and deleting records in a database (you can use SQLite for simplicity).
+
+Use the Proxy Design Pattern to manage database operations. The proxy should act as an intermediary between the API and the database, adding a layer of control or additional logic before accessing the actual database.
+
+Your task involves the following steps:
+
+1. **Design the Proxy Class**: Create a `DatabaseProxy` class that will handle all database operations such as connecting to the database, performing CRUD operations, and closing the connection. This class should ensure that any access to the database is done through the proxy.
+
+2. **Implement the Real Subject Class**: Implement a `DatabaseManager` class that directly interacts with the SQLite database. This class should have methods for creating a table, adding a record, fetching records, updating a record, and deleting a record.
+
+3. **Integrate Proxy with the API**: Modify the Flask routes to use the `DatabaseProxy` for all database interactions. For example:
+   - `POST /create` should use the proxy to add a new record.
+   - `GET /read` should use the proxy to fetch records.
+   - `PUT /update` should use the proxy to update a specific record.
+   - `DELETE /delete` should use the proxy to delete a specific record.
+
+4. **Add Logic to Proxy**: Implement logic in the `DatabaseProxy` class to control access, such as logging each operation, caching results, or adding validation checks before performing operations.
+
+5. **Test the API**: Provide examples of how to test the API using tools like `curl` or Postman. Ensure all CRUD operations are tested through the proxy.
+
+6. **Document the Code**: Include comments and documentation explaining how each part of the code works, especially focusing on how the Proxy Design Pattern is applied.
+
+Generate the code following this specification.
+
+
+Write a test suite using pytest to ensure 100% statement coverage for the CRUD API created using the Proxy Design Pattern. The code to be tested is from the previous prompt.
+
+The test suite should include:
+
+1. Tests for creating a new record (`POST /create`), verifying that the record is correctly added to the database.
+2. Tests for reading records (`GET /read`), ensuring that data retrieval works as expected. This should cover all scenarios, such as when the database is empty or when multiple records are present.
+3. Tests for updating a record (`PUT /update`), confirming that the update operation correctly modifies the data in the database.
+4. Tests for deleting a record (`DELETE /delete`), ensuring that the record is properly removed from the database.
+5. Tests for the Proxy class, verifying that it correctly controls access to the database and that all functions within the Proxy are invoked as intended.
+
+Ensure the test suite covers every line of code (100% statement coverage), making sure that no part of the code is left untested.
