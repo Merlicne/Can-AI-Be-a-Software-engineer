@@ -1,0 +1,27 @@
+Create a Java application that uses the Proxy Design Pattern to implement a simple CRUD API. The Proxy should act as an intermediary between the API and the database. The application should include the following:
+
+1. A `Database` interface that defines CRUD operations: `create`, `read`, `update`, and `delete`.
+2. A `RealDatabase` class that implements the `Database` interface and performs actual database operations.
+3. A `DatabaseProxy` class that also implements the `Database` interface and controls access to the `RealDatabase` class.
+4. A simple API class that uses the `DatabaseProxy` to perform CRUD operations.
+5. Demonstrate the usage of the API with a main method.
+
+Ensure that the code is well-documented and follows best practices for Java programming.
+
+
+Create unit tests for a Java application that uses the Proxy Design Pattern to implement a simple CRUD API. The goal is to achieve 100% statement coverage. The application includes the following components:
+
+1. A [`Database`]
+3. A [`DatabaseProxy`] class.
+4. A simple API class that uses the [`DatabaseProxy`] to perform CRUD operations.
+
+Write unit tests for each component to ensure that all statements in the code are executed at least once. Use a testing framework like JUnit to implement the tests. Ensure that the tests cover all possible paths and edge cases. The tests should include:
+
+1. Creating a new record.
+2. Reading an existing record.
+3. Updating an existing record.
+4. Deleting an existing record.
+5. Handling cases where the record does not exist.
+6. Ensuring that the proxy correctly delegates to the real database.
+
+Ensure that the code is well-documented and follows best practices for Java programming.
