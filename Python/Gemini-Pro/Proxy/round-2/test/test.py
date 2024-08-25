@@ -1,133 +1,124 @@
-import sqlite3
-import json
 import pytest
-from app import app, DatabaseProxy  # Import your Flask app and DatabaseProxy
-
-# --- Fixtures ---
-
-@pytest.fixture
-def client():
-    """Create a test client for the Flask app."""
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+import sqlite3
+from your_module import BookAPI, DatabaseProxy  # Replace 'your_module' with the actual module name
 
 @pytest.fixture
-def db_proxy():
-    """Create a DatabaseProxy instance with a test database."""
-    test_db = 'test_products.db'
-    proxy = DatabaseProxy(test_db)
-
-    # Create the table
-    with proxy.connect() as conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS products (
+def db_file():
+    """Fixture to manage the test database file."""
+    db_file = "test_books.db"
+    with sqlite3.connect(db_file) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS books (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                price REAL NOT NULL
+                title TEXT NOT NULL,
+                author TEXT NOT NULL,
+                isbn TEXT NOT NULL UNIQUE
             )
-        ''')
+        """)
+    yield db_file
+    # Delete the test database after tests
+    try:
+        os.remove(db_file)
+    except FileNotFoundError:
+        pass
 
-    yield proxy
+def test_create_book(db_file):
+    """Test successful book creation with valid data."""
+    book_api = BookAPI(db_file)
+    result = book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802")
+    assert result is not None
 
-    # Clean up - delete the test database
-    # import os
-    # os.remove(test_db) 
+def test_create_book_duplicate_isbn(db_file):
+    """Test handling of duplicate ISBN errors."""
+    book_api = BookAPI(db_file)
+    book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802")
+    with pytest.raises(sqlite3.IntegrityError):
+        book_api.create_book("The Restaurant at the End of the Universe", "Douglas Adams", "0345391802")
 
-@pytest.fixture
-def test_data(db_proxy):
-    """Insert some test data into the database."""
-    db_proxy.add_product("Test Product 1", 10.0)
-    db_proxy.add_product("Test Product 2", 20.0)
-    
+def test_get_book(db_file):
+    """Test retrieving an existing book with a valid ISBN."""
+    book_api = BookAPI(db_file)
+    book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802")
+    result = book_api.get_book("0345391802")
+    assert result is not None
+    assert len(result) == 1
+    assert result[0][1] == "The Hitchhiker's Guide to the Galaxy"
 
-# --- Test Cases ---
+def test_get_book_non_existent(db_file):
+    """Test behavior when trying to retrieve a non-existent book."""
+    book_api = BookAPI(db_file)
+    result = book_api.get_book("1234567890")
+    assert result is None
 
-def test_get_products(client, db_proxy, test_data):
-    """Test retrieving all products."""
-    response = client.get('/products')
-    assert response.status_code == 200
+def test_update_book(db_file):
+    """Test updating an existing book with valid data."""
+    book_api = BookAPI(db_file)
+    book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802")
+    result = book_api.update_book("0345391802", "The Restaurant at the End of the Universe", "Douglas Adams")
+    assert result is not None
 
-    data = response.get_json()
-    assert len(data) == 2  # Make sure both test products are returned
+def test_update_book_non_existent(db_file):
+    """Test handling of updates for non-existent books."""
+    book_api = BookAPI(db_file)
+    result = book_api.update_book("1234567890", "The Restaurant at the End of the Universe", "Douglas Adams")
+    assert result is None
 
-def test_get_product(client, db_proxy, test_data):
-    """Test retrieving a specific product by ID."""
-    response = client.get('/products/1')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['name'] == 'Test Product 1'
+def test_delete_book(db_file):
+    """Test deleting an existing book with a valid ISBN."""
+    book_api = BookAPI(db_file)
+    book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802")
+    result = book_api.delete_book("0345391802")
+    assert result is not None
 
-def test_get_product_not_found(client):
-    """Test retrieving a product that does not exist."""
-    response = client.get('/products/999')
-    assert response.status_code == 404
-    data = response.get_json()
-    assert 'message' in data
+def test_delete_book_non_existent(db_file):
+    """Test handling of deletions for non-existent books."""
+    book_api = BookAPI(db_file)
+    result = book_api.delete_book("1234567890")
+    assert result is None
 
-def test_add_product(client, db_proxy, test_data):
-    """Test adding a new product."""
-    new_product = {'name': 'New Product', 'price': 15.5}
-    response = client.post('/products', json=new_product)
+def test_database_proxy_connection(db_file):
+    """Test successful connection and disconnection to the database."""
+    db_proxy = DatabaseProxy(db_file)
+    with db_proxy as db:
+        assert db.conn is not None
+    assert db.conn is None
 
-    assert response.status_code == 201
-    data = response.get_json()
-    assert 'id' in data 
-    assert data['name'] == 'New Product'
-    assert data['price'] == 15.5
+def test_database_proxy_execute_valid_query(db_file):
+    """Test successful execution of a valid query."""
+    db_proxy = DatabaseProxy(db_file)
+    with db_proxy as db:
+        query = "SELECT * FROM books"
+        result = db.execute(query)
+        assert result is not None
 
-    # Check if the product exists in the database
-    db_product = db_proxy.get_product(data['id'])
-    assert db_product is not None
+def test_database_proxy_execute_invalid_query(db_file):
+    """Test handling of invalid SQL queries."""
+    db_proxy = DatabaseProxy(db_file)
+    with db_proxy as db:
+        query = "INVALID SQL"
+        with pytest.raises(sqlite3.OperationalError):
+            db.execute(query)
 
-def test_update_product(client, db_proxy, test_data):
-    """Test updating an existing product."""
-    updated_product = {'name': 'Updated Product', 'price': 25.0}
-    response = client.put('/products/1', json=updated_product)
-    assert response.status_code == 200
+def test_database_proxy_validate_insert(db_file):
+    """Test data validation for INSERT queries."""
+    db_proxy = DatabaseProxy(db_file)
+    with db_proxy as db:
+        # Test valid data
+        db.execute("INSERT INTO books (title, author, isbn) VALUES (?, ?, ?)", 
+                   ("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "0345391802"))
+        # Test invalid data (missing ISBN)
+        with pytest.raises(Exception):
+            db.execute("INSERT INTO books (title, author) VALUES (?, ?)", 
+                       ("The Restaurant at the End of the Universe", "Douglas Adams"))
 
-    data = response.get_json()
-    assert data['id'] == 1
-    assert data['name'] == 'Updated Product'
-    assert data['price'] == 25.0
-
-    # Check if the product was updated in the database
-    db_product = db_proxy.get_product(1)
-    assert db_product['name'] == 'Updated Product'
-    assert db_product['price'] == 25.0
-
-def test_delete_product(client, db_proxy, test_data):
-    """Test deleting a product."""
-    response = client.delete('/products/1')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['message'] == 'Product with id 1 deleted successfully'
-
-    # Check if the product is actually deleted
-    deleted_product = db_proxy.get_product(1)
-    assert deleted_product is None  
-
-# --- DatabaseProxy Test Cases ---
-
-def test_db_proxy_get_products(db_proxy, test_data):
-    products = db_proxy.get_products()
-    assert isinstance(products, list)
-    assert len(products) > 0 
-
-def test_db_proxy_get_product(db_proxy, test_data):
-    product = db_proxy.get_product(1)
-    assert isinstance(product, dict)
-    assert product['id'] == 1 
-
-def test_db_proxy_add_product(db_proxy):
-    product = db_proxy.add_product("Test Product 3", 30.0)
-    assert isinstance(product, dict)
-    assert product['name'] == "Test Product 3" 
-
-def test_db_proxy_update_product(db_proxy, test_data):
-    updated = db_proxy.update_product(1, "Updated Name", 15.0)
-    assert updated['name'] == "Updated Name"
-
-def test_db_proxy_delete_product(db_proxy, test_data):
-    db_proxy.delete_product(1)
-    assert db_proxy.get_product(1) is None
+def test_database_proxy_error_handling(db_file):
+    """Test error handling mechanisms for database interactions."""
+    db_proxy = DatabaseProxy(db_file)
+    with db_proxy as db:
+        # Test non-existent table
+        with pytest.raises(sqlite3.OperationalError):
+            db.execute("SELECT * FROM non_existent_table")
+        # Test invalid query syntax
+        with pytest.raises(sqlite3.OperationalError):
+            db.execute("SELECT * FROM books WHERE")
