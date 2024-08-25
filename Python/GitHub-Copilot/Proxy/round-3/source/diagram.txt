@@ -1,0 +1,31 @@
+```mermaid
+classDiagram
+    class DatabaseManager {
+        +connect()
+        +create_table()
+        +add_record(data)
+        +fetch_records()
+        +update_record(record_id, data)
+        +delete_record(record_id)
+        +close()
+    }
+
+    class DatabaseProxy {
+        -DatabaseManager db_manager
+        +connect()
+        +create(data)
+        +read()
+        +update(record_id, data)
+        +delete(record_id)
+        +close()
+    }
+
+    class FlaskApp {
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+
+    DatabaseProxy --> DatabaseManager : uses
+    FlaskApp --> DatabaseProxy : interacts
