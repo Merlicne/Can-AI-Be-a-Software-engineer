@@ -1,0 +1,50 @@
+Create a simple CRUD API in Java using the Spring Boot framework. The API should handle creating, reading, updating, and deleting records in a database (use H2 or MySQL for simplicity).
+
+Use the Proxy Design Pattern to manage database operations. The proxy should serve as an intermediary between the API and the database, adding a layer of control or additional logic before accessing the actual database.
+
+Your task involves the following steps:
+
+Design the Proxy Interface: Create an interface DatabaseOperations that defines methods for all CRUD operations: create, read, update, and delete.
+
+Implement the Real Subject Class: Implement a DatabaseManager class that directly interacts with the database through Spring Data JPA or JDBC. This class should implement the DatabaseOperations interface and provide the actual implementation of the CRUD methods.
+
+Create the Proxy Class: Implement a DatabaseProxy class that also implements the DatabaseOperations interface. This class should contain an instance of DatabaseManager and delegate all operations to it, while also adding additional logic such as logging, caching, or security checks.
+
+Integrate the Proxy into the API: Modify the Spring Boot controllers to use the DatabaseProxy for all database interactions. Ensure that:
+
+POST /create uses the proxy to add a new record.
+
+GET /read uses the proxy to fetch records.
+
+PUT /update uses the proxy to update a specific record.
+
+DELETE /delete uses the proxy to delete a specific record.
+
+Add Logic to Proxy: Implement logic in the DatabaseProxy class to control access, such as logging each operation, validating input, or adding caching mechanisms before performing database operations.
+
+Test the API: Provide examples of how to test the API using Postman or curl. Ensure that all CRUD operations are tested through the proxy, verifying the correct behavior.
+
+Document the Code: Include comments and documentation explaining how each part of the code works, particularly focusing on how the Proxy Design Pattern is applied and the benefits it provides.
+
+Generate the code following this specification.
+
+
+
+
+Write a test suite using JUnit to ensure 100% statement coverage for the CRUD API created using the Proxy Design Pattern in Java. The code to be tested is from the previous prompt.
+
+The test suite should include:
+
+Tests for creating a new record (POST /create), verifying that the record is correctly added to the database through the proxy.
+
+Tests for reading records (GET /read), ensuring that data retrieval works as expected, covering scenarios where the database is empty or contains multiple records.
+
+Tests for updating a record (PUT /update), confirming that the update operation correctly modifies the data in the database.
+
+Tests for deleting a record (DELETE /delete), ensuring that the record is properly removed from the database.
+
+Tests for the DatabaseProxy class, verifying that it correctly controls access to the DatabaseManager and that all functions within the proxy are invoked as intended.
+
+Tests for edge cases and exception handling, ensuring that all possible code paths are covered.
+
+Ensure that the test suite covers every line of code in the API (100% statement coverage), making sure that no part of the code is left untested.

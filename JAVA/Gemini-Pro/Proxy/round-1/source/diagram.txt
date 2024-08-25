@@ -1,0 +1,46 @@
+classDiagram
+    class DatabaseOperations {
+        +create(T entity) : T
+        +read(Long id) : Optional<T>
+        +readAll() : List<T>
+        +update(T entity) : T
+        +delete(Long id) : void
+    }
+
+    class DatabaseManager {
+        -productRepository : ProductRepository
+        +create(Product product) : Product
+        +read(Long id) : Optional<Product>
+        +readAll() : List<Product>
+        +update(Product product) : Product
+        +delete(Long id) : void
+    }
+
+    class DatabaseProxy {
+        -databaseManager : DatabaseManager
+        +create(Product product) : Product
+        +read(Long id) : Optional<Product>
+        +readAll() : List<Product>
+        +update(Product product) : Product
+        +delete(Long id) : void
+    }
+
+    class ProductController {
+        -databaseProxy : DatabaseProxy
+        +createProduct(Product product) : ResponseEntity<Product>
+        +getProduct(Long id) : ResponseEntity<Product>
+        +getAllProducts() : ResponseEntity<List<Product>>
+        +updateProduct(Long id, Product updatedProduct) : ResponseEntity<Product>
+        +deleteProduct(Long id) : ResponseEntity<Void>
+    }
+
+    DatabaseOperations <|.. DatabaseManager
+    DatabaseOperations <|.. DatabaseProxy
+    DatabaseProxy --> DatabaseManager
+    ProductController --> DatabaseProxy
+
+    class Product {
+        -id : Long
+        -name : String
+        -price : double
+    }
