@@ -1,0 +1,49 @@
+classDiagram
+    class DatabaseOperations {
+        <<interface>>
+        +create(employee: Employee) : Employee
+        +readAll() : List~Employee~
+        +readById(id: Long) : Employee
+        +update(id: Long, employee: Employee) : Employee
+        +delete(id: Long) : void
+    }
+
+    class DatabaseManager {
+        -repository: EmployeeRepository
+        +create(employee: Employee) : Employee
+        +readAll() : List~Employee~
+        +readById(id: Long) : Employee
+        +update(id: Long, employee: Employee) : Employee
+        +delete(id: Long) : void
+    }
+
+    class DatabaseProxy {
+        -databaseManager: DatabaseManager
+        +create(employee: Employee) : Employee
+        +readAll() : List~Employee~
+        +readById(id: Long) : Employee
+        +update(id: Long, employee: Employee) : Employee
+        +delete(id: Long) : void
+    }
+
+    class EmployeeController {
+        -databaseOperations: DatabaseOperations
+        +createEmployee(employee: Employee) : ResponseEntity~Employee~
+        +readAllEmployees() : ResponseEntity~List~Employee~~
+        +readEmployeeById(id: Long) : ResponseEntity~Employee~
+        +updateEmployee(id: Long, employee: Employee) : ResponseEntity~Employee~
+        +deleteEmployee(id: Long) : ResponseEntity~Void~
+    }
+
+    class Employee {
+        -id: Long
+        -name: String
+        -department: String
+    }
+
+    DatabaseOperations <|.. DatabaseManager
+    DatabaseOperations <|.. DatabaseProxy
+    DatabaseProxy --> DatabaseManager
+    EmployeeController --> DatabaseOperations
+    EmployeeController ..> Employee
+    DatabaseManager --> Employee

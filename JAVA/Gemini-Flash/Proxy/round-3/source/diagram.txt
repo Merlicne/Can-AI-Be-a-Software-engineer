@@ -1,0 +1,45 @@
+classDiagram
+  DatabaseOperations <|.. DatabaseManager
+  DatabaseOperations <|.. DatabaseProxy
+  DatabaseProxy --|> DatabaseManager
+  DataEntity --|> DataEntityRepository
+  DataController --|> DatabaseOperations
+
+  class DatabaseOperations {
+    +create(String data)
+    +read(int id)
+    +update(int id, String data)
+    +delete(int id)
+  }
+
+  class DatabaseManager {
+    +create(String data)
+    +read(int id)
+    +update(int id, String data)
+    +delete(int id)
+  }
+
+  class DatabaseProxy {
+    +create(String data)
+    +read(int id)
+    +update(int id, String data)
+    +delete(int id)
+  }
+
+  class DataEntity {
+    -id: int
+    -data: String
+  }
+
+  class DataEntityRepository {
+    +save(DataEntity entity)
+    +findById(int id)
+    +deleteById(int id)
+  }
+
+  class DataController {
+    +create(String data)
+    +read(int id)
+    +update(int id, String data)
+    +delete(int id)
+  }
