@@ -1,0 +1,27 @@
+## Generate a CRUD API with Proxy Design Pattern in Python
+
+I need you to generate a simple CRUD API for managing product data using the Proxy Design Pattern to connect to a SQLite database.
+
+**Requirements:**
+
+* The API should have basic CRUD functions: `create`, `read`, `update`, `delete` for product data.
+* Use SQLite as the database.
+* Create a Proxy class to handle database connection, transaction management, and authorization.
+* The API should have error handling.
+* The API should have clear documentation and be easy to use.
+
+## Generate Test Cases
+
+Please generate a set of Test Cases that achieve 100% Statement Coverage for the CRUD API code using the Proxy Design Pattern for managing product data in SQLite (which was generated from the previous prompt).
+
+**Requirements:**
+
+* Test Cases should cover all parts of the CRUD API code.
+* Include tests for the create, read, update, delete, connect, execute, close functions, and others.
+* Test scenarios should include both normal cases and error cases (e.g., invalid data, database connection failures).
+
+**Desired Output:**
+
+* A set of Test Cases that achieve 100% Statement Coverage.
+* Examples of how to run the Test Cases.
+* Results of running the Test Cases.
