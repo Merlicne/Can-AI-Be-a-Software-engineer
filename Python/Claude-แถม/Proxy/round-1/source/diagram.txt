@@ -1,0 +1,66 @@
+classDiagram
+    class DatabaseInterface {
+        <<interface>>
+        +create(table: str, data: Dict)
+        +read(table: str, id: int)
+        +update(table: str, id: int, data: Dict)
+        +delete(table: str, id: int)
+    }
+
+    class RealDatabase {
+        -db_name: str
+        -connection
+        +connect()
+        +close()
+        +create(table: str, data: Dict)
+        +read(table: str, id: int)
+        +update(table: str, id: int, data: Dict)
+        +delete(table: str, id: int)
+    }
+
+    class DatabaseProxy {
+        -real_database: RealDatabase
+        -cache: Dict
+        +create(table: str, data: Dict)
+        +read(table: str, id: int)
+        +update(table: str, id: int, data: Dict)
+        +delete(table: str, id: int)
+    }
+
+    class DatabaseFactory {
+        <<interface>>
+        +create_connection()
+    }
+
+    class SQLiteFactory {
+        -db_name: str
+        +create_connection()
+    }
+
+    class MySQLFactory {
+        -host: str
+        -user: str
+        -password: str
+        -database: str
+        +create_connection()
+    }
+
+    class PostgreSQLFactory {
+        -host: str
+        -user: str
+        -password: str
+        -database: str
+        +create_connection()
+    }
+
+    class Client
+
+    DatabaseInterface <|.. RealDatabase
+    DatabaseInterface <|.. DatabaseProxy
+    DatabaseProxy o-- RealDatabase
+    DatabaseFactory <|.. SQLiteFactory
+    DatabaseFactory <|.. MySQLFactory
+    DatabaseFactory <|.. PostgreSQLFactory
+    RealDatabase o-- DatabaseFactory
+    Client --> DatabaseProxy
+    Client --> DatabaseFactory
