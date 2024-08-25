@@ -1,0 +1,52 @@
+classDiagram
+    class DatabaseOperations {
+        +create(T):T
+        +read(ID):T
+        +readAll():List~T~
+        +update(T):T
+        +delete(ID):void
+    }
+
+    class DatabaseManager {
+        -productRepository: ProductRepository
+        +create(Product):Product
+        +read(Long):Product
+        +readAll():List~Product~
+        +update(Product):Product
+        +delete(Long):void
+    }
+
+    class DatabaseProxy {
+        -databaseManager: DatabaseManager
+        +create(Product):Product
+        +read(Long):Product
+        +readAll():List~Product~
+        +update(Product):Product
+        +delete(Long):void
+    }
+
+    class ProductController {
+        -databaseProxy: DatabaseProxy
+        +createProduct(Product):ResponseEntity~Product~
+        +readProduct(Long):ResponseEntity~Product~
+        +readAllProducts():ResponseEntity~List~Product~~
+        +updateProduct(Long, Product):ResponseEntity~Product~
+        +deleteProduct(Long):ResponseEntity~Void~
+    }
+
+    class Product {
+        -id: Long
+        -name: String
+        -price: double
+    }
+
+    class ProductRepository {
+        <<Interface>>
+    }
+
+    DatabaseOperations <|.. DatabaseManager : implements
+    DatabaseOperations <|.. DatabaseProxy : implements
+    DatabaseProxy --> DatabaseManager : delegates to
+    ProductController --> DatabaseProxy : uses
+    DatabaseManager --> ProductRepository : uses
+    ProductController --> Product : uses
