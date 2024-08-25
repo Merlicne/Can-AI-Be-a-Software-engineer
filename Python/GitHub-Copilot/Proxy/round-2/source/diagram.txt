@@ -1,0 +1,40 @@
+classDiagram
+    class Flask {
+        +request
+        +jsonify
+    }
+
+    class sqlite3 {
+        +connect(db_name)
+    }
+
+    class logging {
+        +basicConfig(level)
+        +info(message)
+    }
+
+    class DatabaseManager {
+        -db_name: str
+        -conn: Connection
+        +__init__(db_name: str)
+        +connect()
+        +close()
+        +add_record(data: str) int
+        +fetch_records() list
+        +update_record(record_id: int, data: str) int
+    }
+
+    class DatabaseProxy {
+        -db_manager: DatabaseManager
+        +__init__(db_name: str)
+        +__del__()
+        +add_record(data: str) int
+        +fetch_records() list
+        +update_record(record_id: int, data: str) int
+        +delete_record(record_id: int) int
+    }
+
+    Flask <.. app : uses
+    sqlite3 <.. DatabaseManager : uses
+    logging <.. DatabaseProxy : uses
+    DatabaseManager <|-- DatabaseProxy : delegates
