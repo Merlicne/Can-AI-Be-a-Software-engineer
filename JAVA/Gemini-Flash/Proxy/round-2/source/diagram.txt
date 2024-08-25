@@ -1,0 +1,47 @@
+classDiagram
+  DatabaseOperations <|.. DatabaseManager
+  DatabaseOperations <|.. DatabaseProxy
+  DatabaseManager --|> User
+  DatabaseProxy --|> User
+  DatabaseProxy ..> DatabaseManager
+  UserController ..> DatabaseProxy
+  
+  class DatabaseOperations {
+    +create(entity: T) : T
+    +read(id: Long) : T
+    +readAll() : List<T>
+    +update(entity: T) : T
+    +delete(id: Long) : void
+  }
+  
+  class DatabaseManager {
+    -entityManager: EntityManager
+    +create(user: User) : User
+    +read(id: Long) : User
+    +readAll() : List<User>
+    +update(user: User) : User
+    +delete(id: Long) : void
+  }
+  
+  class DatabaseProxy {
+    -databaseManager: DatabaseManager
+    +create(user: User) : User
+    +read(id: Long) : User
+    +readAll() : List<User>
+    +update(user: User) : User
+    +delete(id: Long) : void
+  }
+  
+  class UserController {
+    -databaseProxy: DatabaseProxy
+    +createUser(user: User) : User
+    +getUser(id: Long) : User
+    +getAllUsers() : List<User>
+    +updateUser(id: Long, user: User) : User
+    +deleteUser(id: Long) : void
+  }
+  
+  class User {
+    -id: Long
+    -name: String
+  }
