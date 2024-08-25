@@ -1,115 +1,112 @@
-from flask import Flask, request, jsonify
 import sqlite3
 
-app = Flask(__name__)
 
-DATABASE = 'products.db'
-
-
-# Database Proxy Class
 class DatabaseProxy:
+    """
+    Proxy class for managing database connections and interactions.
+    """
+
     def __init__(self, db_name):
         self.db_name = db_name
+        self.connection = None
 
-    def _connect(self):
-        return sqlite3.connect(self.db_name)
+    def connect(self):
+        """Establishes a database connection if one doesn't exist."""
+        if not self.connection:
+            self.connection = sqlite3.connect(self.db_name)
+            self.create_table()
 
-    def get_products(self):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM products")
-            rows = cursor.fetchall()
-            return [{'id': row[0], 'name': row[1], 'price': row[2]} for row in rows]
+    def disconnect(self):
+        """Closes the database connection."""
+        if self.connection:
+            self.connection.close()
+            self.connection = None
 
-    def get_product(self, product_id):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM products WHERE id=?", (product_id,))
-            row = cursor.fetchone()
-            if row:
-                return {'id': row[0], 'name': row[1], 'price': row[2]}
-            return None
-
-    def add_product(self, name, price):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO products (name, price) VALUES (?, ?)", (name, price))
-            conn.commit()
-            return cursor.lastrowid
-
-    def update_product(self, product_id, name, price):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE products SET name=?, price=? WHERE id=?", (name, price, product_id))
-            conn.commit()
-            return cursor.rowcount
-
-    def delete_product(self, product_id):
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM products WHERE id=?", (product_id,))
-            conn.commit()
-            return cursor.rowcount
-
-
-# Create an instance of the DatabaseProxy
-db_proxy = DatabaseProxy(DATABASE)
-
-# Create the database table if it doesn't exist
-with db_proxy._connect() as conn:
-    conn.execute(
-        '''
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            price REAL NOT NULL
+    def create_table(self):
+        """Creates the 'books' table if it doesn't exist."""
+        cursor = self.connection.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS books (
+                isbn TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                author TEXT NOT NULL
+            )
+            """
         )
-        '''
-    )
+        self.connection.commit()
+
+    def execute_query(self, query, params=None):
+        """Executes a given SQL query with optional parameters."""
+        self.connect()
+        cursor = self.connection.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        self.connection.commit()
+        return cursor.fetchall()
 
 
-# API Endpoints
-@app.route('/products', methods=['GET', 'POST'])
-def products():
-    if request.method == 'GET':
-        products = db_proxy.get_products()
-        return jsonify(products)
+class BookAPI:
+    """
+    Provides a CRUD API for managing book data through the DatabaseProxy.
+    """
 
-    if request.method == 'POST':
-        data = request.get_json()
-        name = data.get('name')
-        price = data.get('price')
-        if name and price:
-            product_id = db_proxy.add_product(name, price)
-            return jsonify({'message': 'Product added successfully', 'id': product_id}), 201
-        return jsonify({'error': 'Invalid data'}), 400
+    def __init__(self, db_proxy):
+        self.db_proxy = db_proxy
+
+    def create_book(self, title, author, isbn):
+        """Creates a new book entry in the database."""
+        query = "INSERT INTO books (isbn, title, author) VALUES (?, ?, ?)"
+        self.db_proxy.execute_query(query, (isbn, title, author))
+        return {"message": f"Book with ISBN {isbn} created successfully."}
+
+    def get_book(self, isbn):
+        """Retrieves a book entry by its ISBN."""
+        query = "SELECT * FROM books WHERE isbn = ?"
+        result = self.db_proxy.execute_query(query, (isbn,))
+        if result:
+            book = {"isbn": result[0][0], "title": result[0][1], "author": result[0][2]}
+            return book
+        else:
+            return {"message": f"Book with ISBN {isbn} not found."}
+
+    def update_book(self, isbn, title=None, author=None):
+        """Updates a book entry by its ISBN."""
+        query = "UPDATE books SET "
+        params = []
+        if title:
+            query += "title = ?,"
+            params.append(title)
+        if author:
+            query += "author = ?,"
+            params.append(author)
+        query = query[:-1] + " WHERE isbn = ?"
+        params.append(isbn)
+        self.db_proxy.execute_query(query, tuple(params))
+        return {"message": f"Book with ISBN {isbn} updated successfully."}
+
+    def delete_book(self, isbn):
+        """Deletes a book entry by its ISBN."""
+        query = "DELETE FROM books WHERE isbn = ?"
+        self.db_proxy.execute_query(query, (isbn,))
+        return {"message": f"Book with ISBN {isbn} deleted successfully."}
 
 
-@app.route('/products/<int:product_id>', methods=['GET', 'PUT', 'DELETE'])
-def product(product_id):
-    if request.method == 'GET':
-        product = db_proxy.get_product(product_id)
-        if product:
-            return jsonify(product)
-        return jsonify({'error': 'Product not found'}), 404
+# Create the database proxy
+db_proxy = DatabaseProxy("books.db")
 
-    if request.method == 'PUT':
-        data = request.get_json()
-        name = data.get('name')
-        price = data.get('price')
-        if name and price:
-            rows_updated = db_proxy.update_product(product_id, name, price)
-            if rows_updated > 0:
-                return jsonify({'message': 'Product updated successfully'})
-            return jsonify({'error': 'Product not found'}), 404
-        return jsonify({'error': 'Invalid data'}), 400
+# Create the BookAPI instance using the proxy
+book_api = BookAPI(db_proxy)
 
-    if request.method == 'DELETE':
-        rows_deleted = db_proxy.delete_product(product_id)
-        if rows_deleted > 0:
-            return jsonify({'message': 'Product deleted successfully'})
-        return jsonify({'error': 'Product not found'}), 404
+# API Usage Examples:
+print(book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "978-0345391803"))
+print(book_api.get_book("978-0345391803"))
+print(book_api.update_book("978-0345391803", author="Douglas Noel Adams"))
+print(book_api.get_book("978-0345391803"))
+print(book_api.delete_book("978-0345391803"))
+print(book_api.get_book("978-0345391803"))
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
+# Close the database connection
+db_proxy.disconnect()

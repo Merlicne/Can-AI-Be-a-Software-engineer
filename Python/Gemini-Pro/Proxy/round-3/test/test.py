@@ -1,133 +1,104 @@
 import sqlite3
-import json
 import pytest
-from app import app, DatabaseProxy  # Import your Flask app instance and DatabaseProxy
+from your_module import BookAPI, DatabaseProxy  # Replace your_module
 
-# --- Pytest Fixtures ---
 
-@pytest.fixture
-def client():
-    """Create a test client for the Flask application."""
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-
-@pytest.fixture
-def db_proxy():
-    """Create a DatabaseProxy instance with a test database."""
-    TEST_DATABASE = 'test_products.db'
-    proxy = DatabaseProxy(TEST_DATABASE)
-    # Initialize the test database
-    with proxy._connect() as conn:
-        conn.execute(
-            '''
-            CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                price REAL NOT NULL
-            )
-            '''
-        )
+@pytest.fixture(scope="function")
+def db_proxy_fixture():
+    """Fixture to set up and tear down the database for each test function."""
+    db_name = "test_books.db"
+    proxy = DatabaseProxy(db_name)
+    proxy.connect()
     yield proxy
-    # Clean up after tests
-    with proxy._connect() as conn:
-        conn.execute("DROP TABLE products")
-
-@pytest.fixture
-def product_data():
-    """Provide sample product data."""
-    return {'name': 'Test Product', 'price': 19.99}
+    proxy.disconnect()
+    # Clean up the test database file
+    import os
+    os.remove(db_name)
 
 
-# --- Test Cases ---
-
-def test_get_products_empty(client, db_proxy):
-    """Test retrieving products from an empty database."""
-    response = client.get('/products')
-    assert response.status_code == 200
-    assert response.json == []
+# -------------- BookAPI tests --------------
 
 
-def test_add_product(client, db_proxy, product_data):
-    """Test adding a new product."""
-    response = client.post('/products', json=product_data)
-    assert response.status_code == 201
-    assert 'message' in response.json
-    assert 'id' in response.json and response.json['id'] is not None
-
-    # Verify product was added to the database
-    product = db_proxy.get_product(response.json['id'])
-    assert product['name'] == product_data['name']
-    assert product['price'] == product_data['price']
+def test_create_book_successful(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    result = api.create_book("Test Book", "Test Author", "1234567890")
+    assert result == {"message": "Book with ISBN 1234567890 created successfully."}
 
 
-def test_add_product_invalid_data(client):
-    """Test adding a product with missing data."""
-    response = client.post('/products', json={'name': 'Test Product'})  # Missing price
-    assert response.status_code == 400
-    assert 'error' in response.json
+def test_create_book_duplicate_isbn(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    api.create_book("Test Book", "Test Author", "1234567890")
+    with pytest.raises(sqlite3.IntegrityError):
+        api.create_book("Another Book", "Another Author", "1234567890")
 
 
-def test_get_product(client, db_proxy, product_data):
-    """Test retrieving a specific product."""
-    # First, add a product
-    product_id = db_proxy.add_product(product_data['name'], product_data['price'])
-
-    response = client.get(f'/products/{product_id}')
-    assert response.status_code == 200
-    assert response.json['id'] == product_id
-    assert response.json['name'] == product_data['name']
-    assert response.json['price'] == product_data['price']
+def test_get_book_existing(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    api.create_book("Test Book", "Test Author", "1234567890")
+    result = api.get_book("1234567890")
+    assert result == {"isbn": "1234567890", "title": "Test Book", "author": "Test Author"}
 
 
-def test_get_product_not_found(client):
-    """Test retrieving a product that does not exist."""
-    response = client.get('/products/9999') 
-    assert response.status_code == 404
-    assert 'error' in response.json
+def test_get_book_nonexistent(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    result = api.get_book("9876543210")
+    assert result == {"message": "Book with ISBN 9876543210 not found."}
 
 
-def test_update_product(client, db_proxy, product_data):
-    """Test updating an existing product."""
-    # Add a product
-    product_id = db_proxy.add_product(product_data['name'], product_data['price'])
-
-    # Update the product
-    updated_data = {'name': 'Updated Product', 'price': 29.99}
-    response = client.put(f'/products/{product_id}', json=updated_data)
-    assert response.status_code == 200
-    assert 'message' in response.json
-
-    # Verify update in the database
-    product = db_proxy.get_product(product_id)
-    assert product['name'] == updated_data['name']
-    assert product['price'] == updated_data['price']
+def test_update_book_existing(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    api.create_book("Test Book", "Test Author", "1234567890")
+    result = api.update_book("1234567890", title="Updated Title", author="Updated Author")
+    assert result == {"message": "Book with ISBN 1234567890 updated successfully."}
+    updated_book = api.get_book("1234567890")
+    assert updated_book == {"isbn": "1234567890", "title": "Updated Title", "author": "Updated Author"}
 
 
-def test_update_product_not_found(client):
-    """Test updating a product that does not exist."""
-    response = client.put('/products/9999', json={'name': 'Updated', 'price': 1.99})
-    assert response.status_code == 404
-    assert 'error' in response.json
+def test_update_book_nonexistent(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    result = api.update_book("9876543210", title="Updated Title")
+    assert result == {"message": "Book with ISBN 9876543210 updated successfully."}
 
 
-def test_delete_product(client, db_proxy, product_data):
-    """Test deleting a product."""
-    # Add a product
-    product_id = db_proxy.add_product(product_data['name'], product_data['price'])
-
-    # Delete the product
-    response = client.delete(f'/products/{product_id}')
-    assert response.status_code == 200
-    assert 'message' in response.json
-
-    # Verify deletion from the database
-    product = db_proxy.get_product(product_id)
-    assert product is None
+def test_delete_book_existing(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    api.create_book("Test Book", "Test Author", "1234567890")
+    result = api.delete_book("1234567890")
+    assert result == {"message": "Book with ISBN 1234567890 deleted successfully."}
+    assert api.get_book("1234567890") == {"message": "Book with ISBN 1234567890 not found."}
 
 
-def test_delete_product_not_found(client):
-    """Test deleting a product that does not exist."""
-    response = client.delete('/products/9999')
-    assert response.status_code == 404
-    assert 'error' in response.json
+def test_delete_book_nonexistent(db_proxy_fixture):
+    api = BookAPI(db_proxy_fixture)
+    result = api.delete_book("9876543210")
+    assert result == {"message": "Book with ISBN 9876543210 deleted successfully."}
+
+
+# -------------- DatabaseProxy tests --------------
+
+
+def test_database_proxy_connection(db_proxy_fixture):
+    assert db_proxy_fixture.connection is not None
+
+
+def test_database_proxy_disconnection(db_proxy_fixture):
+    db_proxy_fixture.disconnect()
+    assert db_proxy_fixture.connection is None
+
+
+def test_execute_query_with_params(db_proxy_fixture):
+    db_proxy_fixture.execute_query(
+        "INSERT INTO books (isbn, title, author) VALUES (?, ?, ?)",
+        ("978-0123456789", "Test Title", "Test Author"),
+    )
+    result = db_proxy_fixture.execute_query("SELECT * FROM books WHERE isbn = ?", ("978-0123456789",))
+    assert result[0][1] == "Test Title"  # Check if the book title matches
+
+
+def test_execute_query_no_params(db_proxy_fixture):
+    db_proxy_fixture.execute_query(
+        "INSERT INTO books (isbn, title, author) VALUES (?, ?, ?)",
+        ("978-0123456789", "Test Title", "Test Author"),
+    )
+    result = db_proxy_fixture.execute_query("SELECT * FROM books")
+    assert len(result) > 0
