@@ -1,0 +1,51 @@
+I need you to generate a basic CRUD API in Python using the Proxy Design Pattern to manage database access.
+
+**Requirements:**
+
+1. **Database:** SQLite
+2. **Table:** Create a table named "products" with these columns:
+    * id: INTEGER (primary key, auto increment)
+    * name: TEXT
+    * price: REAL
+3. **API Endpoints:**
+    * `/products`: 
+        * GET: Retrieve all products from the "products" table.
+        * POST: Add a new product to the "products" table.
+    * `/products/{id}`:
+        * GET: Retrieve a specific product by its "id" from the "products" table.
+        * PUT: Update an existing product identified by "id" in the "products" table.
+        * DELETE: Delete a product identified by "id" from the "products" table.
+
+4. **Proxy Design Pattern:**
+    *  Create a class named `DatabaseProxy` to act as the Proxy for interacting with the SQLite database.
+    *  The `DatabaseProxy` class should have the methods mentioned earlier.
+    *  Use the `DatabaseProxy` in your API endpoints for handling database interactions.
+
+5. **Framework:** Flask
+
+**Please provide the complete Python code with explanations:**
+
+** Test prompt **
+
+
+Considering the Python code for the CRUD API utilizing the Proxy Design Pattern for database interactions that was generated previously, 
+
+The goal is to create a comprehensive Pytest Test Suite that achieves 100% statement coverage for this Python code.
+
+**Instructions:**
+
+1. **Analyze the Code:** Carefully examine the CRUD API code and identify all possible execution paths, including different conditions and edge cases.
+2. **Design Test Cases:** Design test cases that effectively cover all identified execution paths from step 1. 
+3. **Leverage Pytest Fixtures:** Make appropriate use of Pytest fixtures (e.g., `pytest.fixture`) to set up the necessary test environment, such as handling database connections, preparing test data, and cleaning up after tests.
+4. **Write Assertions:** Utilize Pytest assertions (e.g., `assert`) to verify that the actual results of your tests match the expected outcomes.
+5. **Cover All Functions and Methods:** Ensure that every function and method within the API code, including methods in the `DatabaseProxy`, are called and tested at least once in your test suite.
+6. **Prioritize Statement Coverage:** Focus on writing test cases that exercise all lines of code to achieve 100% statement coverage.
+7. **Consider Mocking (if needed):** If the CRUD API code interacts with external services, consider using mocking to simulate responses from these services, making your tests more isolated, faster, and repeatable. 
+
+**Desired Output:** 
+
+* A complete and well-commented Pytest test suite that achieves 100% statement coverage for the provided CRUD API code.
+
+**Note:**
+
+* You do not need to include the CRUD API code in this prompt. It assumes continuity from the previous prompt. 
