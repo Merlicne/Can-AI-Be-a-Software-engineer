@@ -1,0 +1,28 @@
+classDiagram
+    class DatabaseManager {
+        +connect()
+        +create_table()
+        +add_record(data)
+        +fetch_records()
+        +update_record(record_id, data)
+        +delete_record(record_id)
+    }
+
+    class DatabaseProxy {
+        -db_manager: DatabaseManager
+        +create_table()
+        +add_record(data)
+        +fetch_records()
+        +update_record(record_id, data)
+        +delete_record(record_id)
+    }
+
+    class FlaskApp {
+        +create()
+        +read()
+        +update(record_id)
+        +delete(record_id)
+    }
+
+    DatabaseProxy --> DatabaseManager : delegates to
+    FlaskApp --> DatabaseProxy : uses

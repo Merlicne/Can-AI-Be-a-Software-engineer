@@ -1,0 +1,50 @@
+classDiagram
+  DatabaseOperations <|.. DatabaseManager
+  DatabaseOperations <|.. DatabaseProxy
+  DatabaseProxy --|> DatabaseManager
+  ItemRepository --|> JpaRepository
+  ItemController --|> DatabaseProxy
+  ItemController --|> ItemRepository
+
+  class DatabaseOperations {
+    +create(Item item) : Item
+    +read(Long id) : Item
+    +update(Item item) : Item
+    +delete(Long id) : void
+  }
+
+  class DatabaseManager {
+    -itemRepository : ItemRepository
+    +create(Item item) : Item
+    +read(Long id) : Item
+    +update(Item item) : Item
+    +delete(Long id) : void
+  }
+
+  class DatabaseProxy {
+    -databaseOperations : DatabaseOperations
+    +create(Item item) : Item
+    +read(Long id) : Item
+    +update(Item item) : Item
+    +delete(Long id) : void
+  }
+
+  class Item {
+    -id : Long
+    -name : String
+    -description : String
+  }
+
+  class ItemRepository {
+    +save(Item item) : Item
+    +findById(Long id) : Optional<Item>
+    +deleteById(Long id) : void
+  }
+
+  class ItemController {
+    -databaseOperations : DatabaseOperations
+    +create(Item item) : ResponseEntity<Item>
+    +read(Long id) : ResponseEntity<Item>
+    +update(Long id, Item item) : ResponseEntity<Item>
+    +delete(Long id) : ResponseEntity<Void>
+  }

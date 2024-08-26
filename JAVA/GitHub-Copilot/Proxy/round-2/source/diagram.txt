@@ -1,0 +1,37 @@
+classDiagram
+    class Database {
+        <<interface>>
+        +create(String data)
+        +read(int id) String
+        +update(int id, String data)
+        +delete(int id)
+    }
+
+    class RealDatabase {
+        +create(String data)
+        +read(int id) String
+        +update(int id, String data)
+        +delete(int id)
+    }
+
+    class DatabaseProxy {
+        -RealDatabase realDatabase
+        +create(String data)
+        +read(int id) String
+        +update(int id, String data)
+        +delete(int id)
+    }
+
+    class API {
+        -Database database
+        +API()
+        +createData(String data)
+        +readData(int id) String
+        +updateData(int id, String data)
+        +deleteData(int id)
+    }
+
+    Database <|.. RealDatabase
+    Database <|.. DatabaseProxy
+    DatabaseProxy --> RealDatabase
+    API --> DatabaseProxy
