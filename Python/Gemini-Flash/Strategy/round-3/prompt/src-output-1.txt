@@ -1,0 +1,352 @@
+Pluggable Authentication System with Strategy Design Pattern
+
+This project implements a pluggable authentication system in Python using the Strategy Design Pattern. It allows easy switching between different authentication mechanisms: Basic, Session, JWT, and API Key. Each strategy is encapsulated in its own class, making them interchangeable.
+
+Directory Structure:
+
+├── tests
+│   └── test_authentication.py
+└── authentication
+    ├── strategies
+    │   ├── basic_auth.py
+    │   ├── session_auth.py
+    │   ├── jwt_auth.py
+    │   └── api_key_auth.py
+    └── authenticator.py
+content_copy
+Use code with caution.
+
+Dependencies:
+
+Python 3.6+
+
+requests
+
+python-jwt
+
+bcrypt (for password hashing)
+
+cryptography (for JWT signing)
+
+Code:
+
+authentication/authenticator.py:
+
+from abc import ABC, abstractmethod
+
+class Authenticator(ABC):
+    """
+    Abstract class defining the interface for authentication strategies.
+    """
+
+    @abstractmethod
+    def authenticate(self, request):
+        """
+        Authenticates the request based on the specific strategy.
+        Args:
+            request: The request object.
+        Returns:
+            bool: True if the request is authenticated, False otherwise.
+        """
+        pass
+content_copy
+Use code with caution.
+Python
+
+authentication/strategies/basic_auth.py:
+
+from authentication.authenticator import Authenticator
+from base64 import b64decode
+import re
+
+class BasicAuth(Authenticator):
+    """
+    Basic Authentication strategy.
+    """
+
+    def __init__(self, users):
+        """
+        Initializes the BasicAuth strategy with a dictionary of users.
+        Args:
+            users: A dictionary mapping usernames to passwords.
+        """
+        self.users = users
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using Basic Authentication.
+        Args:
+            request: The request object.
+        Returns:
+            bool: True if the request is authenticated, False otherwise.
+        """
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            match = re.match(r'Basic\s+(.*)', auth_header)
+            if match:
+                encoded_credentials = match.group(1)
+                credentials = b64decode(encoded_credentials).decode()
+                username, password = credentials.split(':', 1)
+                if username in self.users and self.users[username] == password:
+                    return True
+        return False
+content_copy
+Use code with caution.
+Python
+
+authentication/strategies/session_auth.py:
+
+from authentication.authenticator import Authenticator
+from uuid import uuid4
+
+class SessionAuth(Authenticator):
+    """
+    Session-based Authentication strategy.
+    """
+
+    def __init__(self, storage):
+        """
+        Initializes the SessionAuth strategy with a storage mechanism.
+        Args:
+            storage: A storage object (e.g., in-memory dictionary, database) to store sessions.
+        """
+        self.storage = storage
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using Session-based Authentication.
+        Args:
+            request: The request object.
+        Returns:
+            bool: True if the request is authenticated, False otherwise.
+        """
+        session_id = request.cookies.get('session_id')
+        if session_id:
+            if session_id in self.storage:
+                return True
+        return False
+
+    def create_session(self, user):
+        """
+        Creates a new session for a user.
+        Args:
+            user: The user object.
+        Returns:
+            str: The session ID.
+        """
+        session_id = str(uuid4())
+        self.storage[session_id] = user
+        return session_id
+content_copy
+Use code with caution.
+Python
+
+authentication/strategies/jwt_auth.py:
+
+from authentication.authenticator import Authenticator
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.hazmat.backends import default_backend
+from cryptography.exceptions import InvalidSignature
+from datetime import datetime, timedelta
+import jwt
+
+class JWTAuth(Authenticator):
+    """
+    JWT Authentication strategy.
+    """
+
+    def __init__(self, private_key, public_key, token_expiry_minutes=30):
+        """
+        Initializes the JWTAuth strategy with private and public keys for signing and verifying the token.
+        Args:
+            private_key: The private key for signing the token.
+            public_key: The public key for verifying the token.
+            token_expiry_minutes: The token expiry time in minutes.
+        """
+        self.private_key = load_pem_private_key(private_key, None, default_backend())
+        self.public_key = public_key
+        self.token_expiry_minutes = token_expiry_minutes
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using JWT Authentication.
+        Args:
+            request: The request object.
+        Returns:
+            bool: True if the request is authenticated, False otherwise.
+        """
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            token = auth_header.split(' ')[1]
+            try:
+                decoded_token = jwt.decode(
+                    token,
+                    self.public_key,
+                    algorithms=['RS256'],
+                    options={'verify_exp': True}
+                )
+                return True
+            except jwt.exceptions.ExpiredSignatureError:
+                return False
+            except jwt.exceptions.InvalidTokenError:
+                return False
+            except InvalidSignature:
+                return False
+        return False
+
+    def generate_token(self, user):
+        """
+        Generates a JWT token for a user.
+        Args:
+            user: The user object.
+        Returns:
+            str: The JWT token.
+        """
+        payload = {
+            'user_id': user.id,
+            'exp': datetime.utcnow() + timedelta(minutes=self.token_expiry_minutes)
+        }
+        token = jwt.encode(payload, self.private_key, algorithm='RS256')
+        return token.decode('utf-8')
+content_copy
+Use code with caution.
+Python
+
+authentication/strategies/api_key_auth.py:
+
+from authentication.authenticator import Authenticator
+
+class APIKeyAuth(Authenticator):
+    """
+    API Key Authentication strategy.
+    """
+
+    def __init__(self, api_keys):
+        """
+        Initializes the APIKeyAuth strategy with a dictionary of API keys.
+        Args:
+            api_keys: A dictionary mapping user IDs to API keys.
+        """
+        self.api_keys = api_keys
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using API Key Authentication.
+        Args:
+            request: The request object.
+        Returns:
+            bool: True if the request is authenticated, False otherwise.
+        """
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            api_key = auth_header.split(' ')[1]
+            if api_key in self.api_keys.values():
+                return True
+        return False
+content_copy
+Use code with caution.
+Python
+
+tests/test_authentication.py:
+
+from unittest import TestCase
+from unittest.mock import MagicMock
+from authentication.authenticator import Authenticator
+from authentication.strategies.basic_auth import BasicAuth
+from authentication.strategies.session_auth import SessionAuth
+from authentication.strategies.jwt_auth import JWTAuth
+from authentication.strategies.api_key_auth import APIKeyAuth
+
+class TestAuthentication(TestCase):
+
+    def test_basic_auth(self):
+        users = {'user1': 'password1', 'user2': 'password2'}
+        basic_auth = BasicAuth(users)
+        request = MagicMock()
+        request.headers = {'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQx'}
+        self.assertTrue(basic_auth.authenticate(request))
+        request.headers = {'Authorization': 'Basic dXNlcjI6cGFzc3dvcmQy'}
+        self.assertTrue(basic_auth.authenticate(request))
+        request.headers = {'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQy'}
+        self.assertFalse(basic_auth.authenticate(request))
+
+    def test_session_auth(self):
+        storage = {}
+        session_auth = SessionAuth(storage)
+        request = MagicMock()
+        request.cookies = {'session_id': 'some_session_id'}
+        self.assertFalse(session_auth.authenticate(request))
+        session_auth.create_session('user')
+        self.assertTrue(session_auth.authenticate(request))
+
+    def test_jwt_auth(self):
+        private_key = b'-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----'
+        public_key = b'-----BEGIN PUBLIC KEY-----\n-----END PUBLIC KEY-----'
+        jwt_auth = JWTAuth(private_key, public_key)
+        request = MagicMock()
+        request.headers = {'Authorization': 'Bearer some_jwt_token'}
+        self.assertFalse(jwt_auth.authenticate(request))
+        token = jwt_auth.generate_token('user')
+        request.headers = {'Authorization': f'Bearer {token}'}
+        self.assertTrue(jwt_auth.authenticate(request))
+
+    def test_api_key_auth(self):
+        api_keys = {'user1': 'key1', 'user2': 'key2'}
+        api_key_auth = APIKeyAuth(api_keys)
+        request = MagicMock()
+        request.headers = {'Authorization': 'Bearer key1'}
+        self.assertTrue(api_key_auth.authenticate(request))
+        request.headers = {'Authorization': 'Bearer key2'}
+        self.assertTrue(api_key_auth.authenticate(request))
+        request.headers = {'Authorization': 'Bearer invalid_key'}
+        self.assertFalse(api_key_auth.authenticate(request))
+content_copy
+Use code with caution.
+Python
+
+Usage:
+
+from authentication.strategies import BasicAuth, SessionAuth, JWTAuth, APIKeyAuth
+from authentication.authenticator import Authenticator
+
+# Example usage with Basic Authentication
+users = {'user1': 'password1', 'user2': 'password2'}
+basic_auth = BasicAuth(users)
+
+# Example usage with Session Authentication
+storage = {}
+session_auth = SessionAuth(storage)
+
+# Example usage with JWT Authentication
+private_key = b'-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----'
+public_key = b'-----BEGIN PUBLIC KEY-----\n-----END PUBLIC KEY-----'
+jwt_auth = JWTAuth(private_key, public_key)
+
+# Example usage with API Key Authentication
+api_keys = {'user1': 'key1', 'user2': 'key2'}
+api_key_auth = APIKeyAuth(api_keys)
+
+# Switching authentication strategies
+authenticator = Authenticator  # Use the appropriate strategy class
+content_copy
+Use code with caution.
+Python
+
+Explanation:
+
+Abstract Class: The Authenticator abstract class defines the common authenticate method, which all authentication strategies must implement.
+
+Concrete Strategies: Each authentication strategy (BasicAuth, SessionAuth, JWTAuth, APIKeyAuth) inherits from Authenticator and implements its specific authentication logic.
+
+Interchangeability: The main application can switch between different authentication strategies by simply creating an instance of the desired strategy and assigning it to the authenticator variable.
+
+Benefits of using Strategy Design Pattern:
+
+Decoupling: The authentication logic is decoupled from the main application, making it easier to modify and extend.
+
+Flexibility: The application can easily switch between different authentication strategies without changing its core logic.
+
+Testability: Each authentication strategy can be tested independently, ensuring the correctness of the authentication logic.
+
+Note: This is a basic example and can be further extended to support more authentication methods, error handling, and database integration.

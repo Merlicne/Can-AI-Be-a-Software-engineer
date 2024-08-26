@@ -1,0 +1,411 @@
+To create a comprehensive JUnit test suite for your pluggable authentication system using the Strategy Design Pattern, follow these detailed steps. The test suite will ensure 100% statement coverage by thoroughly testing each authentication strategy (Basic, Session-Based, JWT, API Key) and edge cases.
+
+### Test Suite Setup
+
+1. **Dependencies**: Make sure to include necessary testing libraries such as JUnit, Mockito, and a code coverage tool like JaCoCo in your `pom.xml` or `build.gradle`.
+
+   ```xml
+   <!-- Maven Example -->
+   <dependency>
+       <groupId>org.junit.jupiter</groupId>
+       <artifactId>junit-jupiter-api</artifactId>
+       <version>5.8.2</version>
+       <scope>test</scope>
+   </dependency>
+   <dependency>
+       <groupId>org.mockito</groupId>
+       <artifactId>mockito-core</artifactId>
+       <version>4.0.0</version>
+       <scope>test</scope>
+   </dependency>
+   ```
+
+2. **Mock Setup**: Use Mockito to create mock `HttpServletRequest` objects.
+
+### Test Cases
+
+#### 1. Basic Authentication Strategy Tests
+
+```java
+import com.example.authentication.BasicAuthenticator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+class BasicAuthenticatorTest {
+
+    private BasicAuthenticator authenticator;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authenticator = new BasicAuthenticator();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticateValidCredentials() {
+        when(request.getHeader("Authorization")).thenReturn("Basic " + java.util.Base64.getEncoder().encodeToString("user1:password1".getBytes()));
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateInvalidCredentials() {
+        when(request.getHeader("Authorization")).thenReturn("Basic " + java.util.Base64.getEncoder().encodeToString("user1:wrongPassword".getBytes()));
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMissingAuthorizationHeader() {
+        when(request.getHeader("Authorization")).thenReturn(null);
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMalformedAuthorizationHeader() {
+        when(request.getHeader("Authorization")).thenReturn("Basic malformed");
+        assertFalse(authenticator.authenticate(request));
+    }
+}
+```
+
+#### 2. Session-Based Authentication Strategy Tests
+
+```java
+import com.example.authentication.SessionAuthenticator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+class SessionAuthenticatorTest {
+
+    private SessionAuthenticator authenticator;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authenticator = new SessionAuthenticator();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testCreateSession() {
+        String sessionId = authenticator.createSession("user1");
+        assertTrue(authenticator.authenticate(createRequestWithCookie(sessionId)));
+    }
+
+    @Test
+    void testAuthenticateValidSession() {
+        String sessionId = authenticator.createSession("user1");
+        assertTrue(authenticator.authenticate(createRequestWithCookie(sessionId)));
+    }
+
+    @Test
+    void testAuthenticateInvalidSession() {
+        assertFalse(authenticator.authenticate(createRequestWithCookie("invalidSessionId")));
+    }
+
+    @Test
+    void testAuthenticateMissingSessionCookie() {
+        when(request.getCookies()).thenReturn(null);
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testLogoutFunctionality() {
+        String sessionId = authenticator.createSession("user1");
+        authenticator.invalidateSession(sessionId); // Implement invalidate method to remove session
+        assertFalse(authenticator.authenticate(createRequestWithCookie(sessionId)));
+    }
+
+    private HttpServletRequest createRequestWithCookie(String sessionId) {
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Cookie cookie = new Cookie("SESSIONID", sessionId);
+        when(request.getCookies()).thenReturn(new Cookie[]{cookie});
+        return request;
+    }
+}
+```
+
+#### 3. JWT Authentication Strategy Tests
+
+```java
+import com.example.authentication.JWTAuthenticator;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+class JWTAuthenticatorTest {
+
+    private JWTAuthenticator authenticator;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authenticator = new JWTAuthenticator();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testGenerateToken() {
+        String token = authenticator.generateToken("user1");
+        assertTrue(token != null && !token.isEmpty());
+    }
+
+    @Test
+    void testAuthenticateValidJWT() {
+        String token = authenticator.generateToken("user1");
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateExpiredJWT() {
+        // Set token expiration to a past date
+        String token = Jwts.builder()
+                .setSubject("user1")
+                .setExpiration(new Date(System.currentTimeMillis() - 1000))
+                .signWith(SignatureAlgorithm.HS256, JWTAuthenticator.SECRET_KEY)
+                .compact();
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateInvalidJWT() {
+        when(request.getHeader("Authorization")).thenReturn("Bearer invalidToken");
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMissingJWT() {
+        when(request.getHeader("Authorization")).thenReturn(null);
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    // Optional: Test for token refresh if implemented
+}
+```
+
+#### 4. API Key Authentication Strategy Tests
+
+```java
+import com.example.authentication.APIKeyAuthenticator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+class APIKeyAuthenticatorTest {
+
+    private APIKeyAuthenticator authenticator;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authenticator = new APIKeyAuthenticator();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticateValidAPIKey() {
+        when(request.getHeader("API-Key")).thenReturn("key1");
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateInvalidAPIKey() {
+        when(request.getHeader("API-Key")).thenReturn("invalidKey");
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMissingAPIKey() {
+        when(request.getHeader("API-Key")).thenReturn(null);
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateAPIKeyAsQueryParameter() {
+        // Assuming the API Key should be in headers, not query parameters
+        when(request.getParameter("API-Key")).thenReturn("key1");
+        assertFalse(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMalformedAPIKey() {
+        when(request.getHeader("API-Key")).thenReturn("malformedKey");
+        assertFalse(authenticator.authenticate(request));
+    }
+}
+```
+
+#### 5. Edge Cases
+
+```java
+import com.example.authentication.AuthContext;
+import com.example.authentication.BasicAuthenticator;
+import com.example.authentication.JWTAuthenticator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class EdgeCaseTest {
+
+    private AuthContext authContext;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authContext = new AuthContext();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testConcurrentRequestsSameSessionID() {
+        // Assuming session ID handling is thread-safe and consistent
+        String sessionId = new SessionAuthenticator().createSession("user1");
+        authContext.setAuthenticator(new SessionAuthenticator());
+        HttpServletRequest request1 = createRequestWithCookie(sessionId);
+        HttpServletRequest request2 = createRequestWithCookie(sessionId);
+
+        assertTrue(authContext.authenticate(request1));
+        assertTrue(authContext.authenticate(request2));
+    }
+
+    @Test
+    void testMultipleFailedAttempts() {
+        // Simulate multiple failed authentication attempts
+        authContext.setAuthenticator(new BasicAuthenticator());
+
+        for (int i = 0; i < 5; i++) {
+            when(request.getHeader("Authorization")).thenReturn("Basic " + java.util.Base64.getEncoder().encodeToString("user1:wrongPassword".getBytes()));
+            assertFalse(authContext.authenticate(request));
+        }
+    }
+
+    @Test
+    void testLargePayload() {
+        // Test behavior with large payload in Authorization header
+        String largePayload =
+
+ "Basic " + java.util.Base64.getEncoder().encodeToString("user1:".repeat(1000).getBytes());
+        when(request.getHeader("Authorization")).thenReturn(largePayload);
+        assertFalse(authContext.authenticate(request));
+    }
+
+    @Test
+    void testHighLoad() {
+        // Simulate high load by rapidly switching strategies and making requests
+        for (int i = 0; i < 100; i++) {
+            authContext.setAuthenticator(new BasicAuthenticator());
+            assertFalse(authContext.authenticate(request));
+
+            authContext.setAuthenticator(new JWTAuthenticator());
+            assertFalse(authContext.authenticate(request));
+        }
+    }
+
+    private HttpServletRequest createRequestWithCookie(String sessionId) {
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Cookie cookie = new Cookie("SESSIONID", sessionId);
+        when(request.getCookies()).thenReturn(new Cookie[]{cookie});
+        return request;
+    }
+}
+```
+
+#### 6. General Tests for Pluggable Strategy System
+
+```java
+import com.example.authentication.AuthContext;
+import com.example.authentication.BasicAuthenticator;
+import com.example.authentication.JWTAuthenticator;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import javax.servlet.http.HttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class AuthContextTest {
+
+    private AuthContext authContext;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        authContext = new AuthContext();
+        request = Mockito.mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testSwitchingStrategies() {
+        authContext.setAuthenticator(new BasicAuthenticator());
+        when(request.getHeader("Authorization")).thenReturn("Basic " + java.util.Base64.getEncoder().encodeToString("user1:password1".getBytes()));
+        assertTrue(authContext.authenticate(request));
+
+        authContext.setAuthenticator(new JWTAuthenticator());
+        String token = new JWTAuthenticator().generateToken("user1");
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        assertTrue(authContext.authenticate(request));
+    }
+
+    @Test
+    void testNoStrategySelected() {
+        try {
+            authContext.authenticate(request);
+        } catch (IllegalStateException e) {
+            assertTrue(e.getMessage().contains("No authentication strategy set"));
+        }
+    }
+}
+```
+
+### Test Execution and Validation
+
+1. **Run Tests**: Execute the test suite using your build tool (e.g., Maven or Gradle) and ensure all tests pass.
+
+2. **Check Coverage**: Use a code coverage tool like JaCoCo to verify that all lines of code are covered. Ensure 100% statement coverage is achieved.
+
+   ```bash
+   mvn test jacoco:report
+   ```
+
+3. **Review Results**: Examine the coverage reports and adjust tests or implementation as needed to achieve full coverage.
+
+By following these guidelines and implementing the provided tests, you'll ensure comprehensive coverage of all aspects of your authentication system, including valid and invalid scenarios, edge cases, and dynamic strategy switching.

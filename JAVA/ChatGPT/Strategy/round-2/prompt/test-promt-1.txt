@@ -1,0 +1,243 @@
+design a prompt to tell ai to create unittest with 100% statement coverage in this project :
+
+Sure, let's break down the implementation of a pluggable authentication system using the Strategy Design Pattern in Java. This system will encapsulate different authentication mechanisms and allow easy switching between them. Here's a detailed guide including directory structure, dependencies, and implementation.
+
+### Directory Structure
+
+```
+src/
+|-- main/
+|   |-- java/
+|   |   |-- com/
+|   |       |-- example/
+|   |           |-- auth/
+|   |           |   |-- strategy/
+|   |           |   |   |-- Authenticator.java
+|   |           |   |   |-- BasicAuthStrategy.java
+|   |           |   |   |-- SessionAuthStrategy.java
+|   |           |   |   |-- JwtAuthStrategy.java
+|   |           |   |   |-- ApiKeyAuthStrategy.java
+|   |           |   |-- service/
+|   |           |   |   |-- AuthService.java
+|   |           |-- App.java
+|-- test/
+|   |-- java/
+|   |   |-- com/
+|   |       |-- example/
+|   |           |-- auth/
+|   |           |   |-- strategy/
+|   |           |   |   |-- BasicAuthStrategyTest.java
+|   |           |   |   |-- SessionAuthStrategyTest.java
+|   |           |   |   |-- JwtAuthStrategyTest.java
+|   |           |   |   |-- ApiKeyAuthStrategyTest.java
+|   |           |-- service/
+|   |               |-- AuthServiceTest.java
+|-- resources/
+    |-- application.properties
+```
+
+### Dependencies
+
+Include these dependencies in your `pom.xml` (for Maven) or `build.gradle` (for Gradle):
+
+**Maven:**
+```xml
+<dependencies>
+    <!-- Spring Boot Dependencies -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+    <!-- JWT Dependency -->
+    <dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt</artifactId>
+        <version>0.9.1</version>
+    </dependency>
+</dependencies>
+```
+
+**Gradle:**
+```groovy
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'io.jsonwebtoken:jjwt:0.9.1'
+}
+```
+
+### Implementation
+
+#### 1. Define the Strategy Interface
+
+Create the `Authenticator` interface which defines the method `authenticate(request)`:
+
+```java
+package com.example.auth.strategy;
+
+import javax.servlet.http.HttpServletRequest;
+
+public interface Authenticator {
+    boolean authenticate(HttpServletRequest request);
+}
+```
+
+#### 2. Implement Authentication Strategies
+
+**Basic Authentication:**
+
+```java
+package com.example.auth.strategy;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+
+public class BasicAuthStrategy implements Authenticator {
+    private static final Map<String, String> users = new HashMap<>();
+    
+    static {
+        // Example predefined users
+        users.put("user", "password");
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Basic ")) {
+            String base64Credentials = authHeader.substring("Basic ".length()).trim();
+            String credentials = new String(Base64.getDecoder().decode(base64Credentials));
+            String[] values = credentials.split(":", 2);
+            String username = values[0];
+            String password = values[1];
+            return users.containsKey(username) && users.get(username).equals(password);
+        }
+        return false;
+    }
+}
+```
+
+**Session-Based Authentication:**
+
+```java
+package com.example.auth.strategy;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashSet;
+import java.util.Set;
+
+public class SessionAuthStrategy implements Authenticator {
+    private static final Set<String> validSessions = new HashSet<>();
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String sessionId = request.getCookies() != null ? 
+            Arrays.stream(request.getCookies())
+                  .filter(cookie -> "SESSIONID".equals(cookie.getName()))
+                  .map(Cookie::getValue)
+                  .findFirst()
+                  .orElse(null) : null;
+        return sessionId != null && validSessions.contains(sessionId);
+    }
+}
+```
+
+**JWT Authentication:**
+
+```java
+package com.example.auth.strategy;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureException;
+
+import javax.servlet.http.HttpServletRequest;
+
+public class JwtAuthStrategy implements Authenticator {
+    private static final String SECRET_KEY = "your_secret_key";
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring("Bearer ".length()).trim();
+            try {
+                Claims claims = Jwts.parser()
+                        .setSigningKey(SECRET_KEY)
+                        .parseClaimsJws(token)
+                        .getBody();
+                return true; // Token is valid
+            } catch (SignatureException e) {
+                return false; // Invalid token
+            }
+        }
+        return false;
+    }
+}
+```
+
+**API Key Authentication:**
+
+```java
+package com.example.auth.strategy;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashSet;
+import java.util.Set;
+
+public class ApiKeyAuthStrategy implements Authenticator {
+    private static final Set<String> validApiKeys = new HashSet<>();
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String apiKey = request.getHeader("Authorization");
+        if (apiKey != null) {
+            return validApiKeys.contains(apiKey);
+        }
+        return false;
+    }
+}
+```
+
+#### 3. Create the Authentication Service
+
+```java
+package com.example.service;
+
+import com.example.auth.strategy.Authenticator;
+import javax.servlet.http.HttpServletRequest;
+
+public class AuthService {
+    private final Authenticator authenticator;
+
+    public AuthService(Authenticator authenticator) {
+        this.authenticator = authenticator;
+    }
+
+    public boolean authenticate(HttpServletRequest request) {
+        return authenticator.authenticate(request);
+    }
+}
+```
+
+#### 4. Main Application Class
+
+```java
+package com.example;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class App {
+    public static void main(String[] args) {
+        SpringApplication.run(App.class, args);
+    }
+}
+```

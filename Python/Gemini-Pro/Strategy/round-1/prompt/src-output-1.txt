@@ -1,0 +1,250 @@
+Python Pluggable Authentication System with Strategy Pattern
+
+This project implements a pluggable authentication system in Python using the Strategy Design Pattern. It allows for easy switching between Basic, Session-Based, JWT, and API Key authentication mechanisms.
+
+Directory Structure:
+auth_system/
+├── strategies/
+│   ├── __init__.py
+│   ├── basic_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   └── api_key_auth.py
+├── authenticator.py
+├── exceptions.py
+└── main.py
+content_copy
+Use code with caution.
+Dependencies:
+
+Python 3.7+
+
+Flask (for example web application)
+
+PyJWT (for JWT authentication)
+
+Install dependencies using pip:
+
+pip install Flask PyJWT
+content_copy
+Use code with caution.
+Bash
+Components:
+
+1. strategies/__init__.py:
+
+from .basic_auth import BasicAuthStrategy
+from .session_auth import SessionAuthStrategy
+from .jwt_auth import JWTAuthStrategy
+from .api_key_auth import APIKeyAuthStrategy
+
+__all__ = [
+    "BasicAuthStrategy",
+    "SessionAuthStrategy",
+    "JWTAuthStrategy",
+    "APIKeyAuthStrategy",
+]
+content_copy
+Use code with caution.
+Python
+
+2. strategies/basic_auth.py:
+
+import base64
+from .__init__ import AuthenticationStrategy
+from ..exceptions import AuthenticationError
+
+class BasicAuthStrategy(AuthenticationStrategy):
+    def __init__(self, users):
+        self.users = users
+
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            raise AuthenticationError('Missing Authorization header')
+
+        auth_parts = auth_header.split(' ')
+        if len(auth_parts) != 2 or auth_parts[0].lower() != 'basic':
+            raise AuthenticationError('Invalid Authorization header format')
+
+        try:
+            username, password = base64.b64decode(auth_parts[1]).decode().split(':')
+        except Exception:
+            raise AuthenticationError('Invalid credentials encoding')
+
+        if self.users.get(username) == password:
+            return True
+        else:
+            raise AuthenticationError('Invalid username or password')
+content_copy
+Use code with caution.
+Python
+
+3. strategies/session_auth.py:
+
+import uuid
+from flask import session
+from .__init__ import AuthenticationStrategy
+from ..exceptions import AuthenticationError
+
+class SessionAuthStrategy(AuthenticationStrategy):
+    def __init__(self):
+        pass
+
+    def authenticate(self, request):
+        session_id = request.cookies.get('session_id')
+        if not session_id or session.get(session_id) is None:
+            raise AuthenticationError('Invalid or missing session ID')
+        return True
+content_copy
+Use code with caution.
+Python
+
+4. strategies/jwt_auth.py:
+
+import jwt
+from .__init__ import AuthenticationStrategy
+from ..exceptions import AuthenticationError
+
+class JWTAuthStrategy(AuthenticationStrategy):
+    def __init__(self, secret_key):
+        self.secret_key = secret_key
+
+    def authenticate(self, request):
+        token = request.headers.get('Authorization')
+        if not token:
+            raise AuthenticationError('Missing Authorization header')
+
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=['HS256'])
+            # Further validation of payload can be done here
+            return True
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationError('Token has expired')
+        except jwt.InvalidTokenError:
+            raise AuthenticationError('Invalid token')
+content_copy
+Use code with caution.
+Python
+
+5. strategies/api_key_auth.py:
+
+from .__init__ import AuthenticationStrategy
+from ..exceptions import AuthenticationError
+
+class APIKeyAuthStrategy(AuthenticationStrategy):
+    def __init__(self, api_keys):
+        self.api_keys = api_keys
+
+    def authenticate(self, request):
+        api_key = request.headers.get('Authorization') or request.args.get('api_key')
+        if not api_key:
+            raise AuthenticationError('Missing API Key')
+
+        if api_key in self.api_keys:
+            return True
+        else:
+            raise AuthenticationError('Invalid API Key')
+content_copy
+Use code with caution.
+Python
+
+6. authenticator.py:
+
+from strategies import (
+    BasicAuthStrategy,
+    SessionAuthStrategy,
+    JWTAuthStrategy,
+    APIKeyAuthStrategy,
+)
+
+class Authenticator:
+    def __init__(self, strategy):
+        self.strategy = strategy
+
+    def authenticate(self, request):
+        return self.strategy.authenticate(request)
+
+    def set_strategy(self, strategy):
+        self.strategy = strategy
+content_copy
+Use code with caution.
+Python
+
+7. exceptions.py:
+
+class AuthenticationError(Exception):
+    pass
+content_copy
+Use code with caution.
+Python
+
+8. main.py (Example usage with Flask):
+
+from flask import Flask, request, jsonify
+from authenticator import Authenticator
+from strategies import *
+from exceptions import AuthenticationError
+
+app = Flask(__name__)
+app.secret_key = "your_secret_key" # For session based auth
+
+# Define users for basic auth
+users = {
+    "user1": "password1",
+    "user2": "password2",
+}
+
+# Define API keys for API key auth
+api_keys = ["key1", "key2"]
+
+# Initialize authenticator with default strategy (e.g., Basic Authentication)
+authenticator = Authenticator(BasicAuthStrategy(users))
+
+@app.route('/login', methods=['POST'])
+def login():
+    # ... Login logic ...
+    # On successful login, set the desired authentication strategy:
+    if request.form.get('auth_type') == 'session':
+        authenticator.set_strategy(SessionAuthStrategy())
+        session['user'] = request.form.get('username')
+        return jsonify({'message': 'Logged in successfully'}), 200
+    elif request.form.get('auth_type') == 'jwt':
+        authenticator.set_strategy(JWTAuthStrategy("your_secret_key"))
+        # Generate and return JWT token
+    elif request.form.get('auth_type') == 'api_key':
+        authenticator.set_strategy(APIKeyAuthStrategy(api_keys))
+        return jsonify({'api_key': 'your_generated_api_key'}), 200
+
+@app.route('/protected')
+def protected_resource():
+    try:
+        authenticator.authenticate(request)
+        return jsonify({'message': 'Access granted'}), 200
+    except AuthenticationError as e:
+        return jsonify({'error': str(e)}), 401
+
+if __name__ == "__main__":
+    app.run(debug=True)
+content_copy
+Use code with caution.
+Python
+Explanation:
+
+Each authentication strategy is implemented as a separate class inheriting from the AuthenticationStrategy interface.
+
+Authenticator class provides a unified interface for using different authentication strategies.
+
+The example application in main.py demonstrates how to initialize the Authenticator with a default strategy and switch between strategies on demand.
+
+The AuthenticationError exception provides a centralized way to handle authentication failures.
+
+Advantages:
+
+Modularity and Reusability: Each authentication strategy is self-contained, allowing for easy maintenance and reuse in different parts of the application.
+
+Flexibility: Switching between authentication methods is as simple as changing the strategy used by the Authenticator.
+
+Testability: Each strategy can be tested independently, ensuring the reliability of the authentication system.
+
+This is a basic implementation, and you can extend it further by adding more authentication strategies, implementing persistence mechanisms for sessions and JWT tokens, and adding more sophisticated error handling and logging.
