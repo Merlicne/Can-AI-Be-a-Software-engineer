@@ -1,0 +1,56 @@
+classDiagram
+    class DatabaseInterface {
+        <<interface>>
+        +create(data: Dict)
+        +read(id: int)
+        +update(id: int, data: Dict)
+        +delete(id: int)
+    }
+    
+    class RealDatabase {
+        -db_name: str
+        -connection
+        +connect()
+        +create(data: Dict)
+        +read(id: int)
+        +update(id: int, data: Dict)
+        +delete(id: int)
+    }
+    
+    class DatabaseProxy {
+        -real_db: RealDatabase
+        -cache: Dict
+        +create(data: Dict)
+        +read(id: int)
+        +update(id: int, data: Dict)
+        +delete(id: int)
+    }
+    
+    class DatabaseStrategy {
+        <<interface>>
+        +connect(**kwargs)
+        +execute(connection, query, params)
+    }
+    
+    class SQLiteStrategy {
+        +connect(**kwargs)
+        +execute(connection, query, params)
+    }
+    
+    class MySQLStrategy {
+        +connect(**kwargs)
+        +execute(connection, query, params)
+    }
+    
+    class PostgreSQLStrategy {
+        +connect(**kwargs)
+        +execute(connection, query, params)
+    }
+    
+    DatabaseInterface <|.. RealDatabase
+    DatabaseInterface <|.. DatabaseProxy
+    DatabaseProxy o-- RealDatabase
+    DatabaseStrategy <|.. SQLiteStrategy
+    DatabaseStrategy <|.. MySQLStrategy
+    DatabaseStrategy <|.. PostgreSQLStrategy
+    RealDatabase o-- DatabaseStrategy
