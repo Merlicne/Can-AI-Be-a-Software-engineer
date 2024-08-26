@@ -1,0 +1,460 @@
+Certainly! I'll create comprehensive unit tests using pytest for our pluggable authentication system. These tests will aim to provide 100% statement coverage for all the authentication strategies we've implemented.
+
+Let's start by updating our project structure to include the new test files:
+
+
+
+```plaintext
+auth_system/
+│
+├── authenticators/
+│   ├── __init__.py
+│   ├── authenticator_interface.py
+│   ├── basic_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   └── api_key_auth.py
+│
+├── utils/
+│   ├── __init__.py
+│   └── exceptions.py
+│
+├── storage/
+│   ├── __init__.py
+│   └── in_memory_storage.py
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_basic_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   ├── test_api_key_auth.py
+│   ├── test_in_memory_storage.py
+│   └── test_main.py
+│
+├── requirements.txt
+├── main.py
+└── README.md
+
+```
+
+Now, let's create the unit tests for each component:
+
+1. Test Basic Authentication
+
+
+
+```python
+# tests/test_basic_auth.py
+
+import pytest
+import base64
+from authenticators.basic_auth import BasicAuthenticator
+from utils.exceptions import AuthenticationError
+
+@pytest.fixture
+def basic_auth():
+    users = {"alice": "password123", "bob": "securepass456"}
+    return BasicAuthenticator(users)
+
+def test_successful_authentication(basic_auth):
+    credentials = base64.b64encode(b"alice:password123").decode("utf-8")
+    request = {"Authorization": f"Basic {credentials}"}
+    assert basic_auth.authenticate(request) == True
+
+def test_failed_authentication(basic_auth):
+    credentials = base64.b64encode(b"alice:wrongpassword").decode("utf-8")
+    request = {"Authorization": f"Basic {credentials}"}
+    assert basic_auth.authenticate(request) == False
+
+def test_missing_authorization_header(basic_auth):
+    request = {}
+    with pytest.raises(AuthenticationError):
+        basic_auth.authenticate(request)
+
+def test_invalid_authorization_header(basic_auth):
+    request = {"Authorization": "Invalid header"}
+    with pytest.raises(AuthenticationError):
+        basic_auth.authenticate(request)
+
+def test_nonexistent_user(basic_auth):
+    credentials = base64.b64encode(b"eve:password123").decode("utf-8")
+    request = {"Authorization": f"Basic {credentials}"}
+    assert basic_auth.authenticate(request) == False
+
+```
+
+2. Test Session-Based Authentication
+
+
+
+```python
+# tests/test_session_auth.py
+
+import pytest
+from authenticators.session_auth import SessionAuthenticator
+from storage.in_memory_storage import InMemoryStorage
+from utils.exceptions import AuthenticationError
+
+@pytest.fixture
+def session_auth():
+    users = {"alice": "password123", "bob": "securepass456"}
+    storage = InMemoryStorage()
+    return SessionAuthenticator(users, storage)
+
+def test_successful_authentication(session_auth):
+    request = {"username": "alice", "password": "password123"}
+    assert session_auth.authenticate(request) == True
+    assert "session_id" in request
+
+def test_failed_authentication(session_auth):
+    request = {"username": "alice", "password": "wrongpassword"}
+    with pytest.raises(AuthenticationError):
+        session_auth.authenticate(request)
+
+def test_successful_session_authentication(session_auth):
+    request = {"username": "alice", "password": "password123"}
+    session_auth.authenticate(request)
+    session_id = request["session_id"]
+
+    new_request = {"session_id": session_id}
+    assert session_auth.authenticate(new_request) == True
+
+def test_invalid_session_id(session_auth):
+    request = {"session_id": "invalid_session_id"}
+    assert session_auth.authenticate(request) == False
+
+def test_missing_credentials(session_auth):
+    request = {}
+    with pytest.raises(AuthenticationError):
+        session_auth.authenticate(request)
+
+def test_nonexistent_user(session_auth):
+    request = {"username": "eve", "password": "password123"}
+    with pytest.raises(AuthenticationError):
+        session_auth.authenticate(request)
+
+```
+
+3. Test JWT Authentication
+
+
+
+```python
+# tests/test_jwt_auth.py
+
+import pytest
+import jwt
+import time
+from authenticators.jwt_auth import JWTAuthenticator
+from utils.exceptions import AuthenticationError
+
+@pytest.fixture
+def jwt_auth():
+    secret_key = "test_secret_key"
+    users = {"alice": "password123", "bob": "securepass456"}
+    return JWTAuthenticator(secret_key, users, token_expiry=1)
+
+def test_successful_authentication(jwt_auth):
+    token = jwt_auth.generate_token("alice")
+    request = {"Authorization": f"Bearer {token}"}
+    assert jwt_auth.authenticate(request) == True
+
+def test_invalid_token(jwt_auth):
+    request = {"Authorization": "Bearer invalid_token"}
+    with pytest.raises(AuthenticationError):
+        jwt_auth.authenticate(request)
+
+def test_expired_token(jwt_auth):
+    token = jwt_auth.generate_token("alice")
+    time.sleep(2)  # Wait for token to expire
+    request = {"Authorization": f"Bearer {token}"}
+    with pytest.raises(AuthenticationError):
+        jwt_auth.authenticate(request)
+
+def test_missing_authorization_header(jwt_auth):
+    request = {}
+    with pytest.raises(AuthenticationError):
+        jwt_auth.authenticate(request)
+
+def test_invalid_authorization_header(jwt_auth):
+    request = {"Authorization": "Invalid header"}
+    with pytest.raises(AuthenticationError):
+        jwt_auth.authenticate(request)
+
+def test_generate_token_invalid_user(jwt_auth):
+    with pytest.raises(AuthenticationError):
+        jwt_auth.generate_token("eve")
+
+def test_token_payload(jwt_auth):
+    token = jwt_auth.generate_token("alice")
+    payload = jwt.decode(token, jwt_auth.secret_key, algorithms=['HS256'])
+    assert payload['username'] == "alice"
+    assert 'exp' in payload
+
+```
+
+4. Test API Key Authentication
+
+
+
+```python
+# tests/test_api_key_auth.py
+
+import pytest
+from authenticators.api_key_auth import APIKeyAuthenticator
+from utils.exceptions import AuthenticationError
+
+@pytest.fixture
+def api_key_auth():
+    api_keys = {"api_key_1": "alice", "api_key_2": "bob"}
+    return APIKeyAuthenticator(api_keys)
+
+def test_successful_authentication(api_key_auth):
+    request = {"api_key": "api_key_1"}
+    assert api_key_auth.authenticate(request) == True
+
+def test_failed_authentication(api_key_auth):
+    request = {"api_key": "invalid_api_key"}
+    assert api_key_auth.authenticate(request) == False
+
+def test_missing_api_key(api_key_auth):
+    request = {}
+    with pytest.raises(AuthenticationError):
+        api_key_auth.authenticate(request)
+
+def test_api_key_in_authorization_header(api_key_auth):
+    request = {"Authorization": "ApiKey api_key_2"}
+    assert api_key_auth.authenticate(request) == True
+
+def test_invalid_authorization_header(api_key_auth):
+    request = {"Authorization": "Bearer api_key_1"}
+    assert api_key_auth.authenticate(request) == False
+
+```
+
+5. Test In-Memory Storage
+
+
+
+```python
+# tests/test_in_memory_storage.py
+
+import pytest
+from storage.in_memory_storage import InMemoryStorage
+
+@pytest.fixture
+def storage():
+    return InMemoryStorage()
+
+def test_set_and_get(storage):
+    storage.set("key1", "value1")
+    assert storage.get("key1") == "value1"
+
+def test_get_nonexistent_key(storage):
+    assert storage.get("nonexistent") is None
+
+def test_exists(storage):
+    storage.set("key1", "value1")
+    assert storage.exists("key1") == True
+    assert storage.exists("nonexistent") == False
+
+def test_remove(storage):
+    storage.set("key1", "value1")
+    storage.remove("key1")
+    assert storage.exists("key1") == False
+
+def test_remove_nonexistent_key(storage):
+    storage.remove("nonexistent")  # Should not raise an exception
+
+def test_clear(storage):
+    storage.set("key1", "value1")
+    storage.set("key2", "value2")
+    storage.clear()
+    assert storage.exists("key1") == False
+    assert storage.exists("key2") == False
+
+```
+
+6. Test Main Application
+
+
+
+```python
+# tests/test_main.py
+
+import pytest
+import base64
+from main import authenticate_request, basic_auth, session_auth, jwt_auth, api_key_auth
+
+def test_basic_auth():
+    credentials = base64.b64encode(b"alice:password123").decode("utf-8")
+    request = {"Authorization": f"Basic {credentials}"}
+    assert authenticate_request("basic", request) == True
+
+def test_session_auth():
+    request = {"username": "alice", "password": "password123"}
+    assert authenticate_request("session", request) == True
+    assert "session_id" in request
+
+    session_id = request["session_id"]
+    new_request = {"session_id": session_id}
+    assert authenticate_request("session", new_request) == True
+
+def test_jwt_auth():
+    token = jwt_auth.generate_token("alice")
+    request = {"Authorization": f"Bearer {token}"}
+    assert authenticate_request("jwt", request) == True
+
+def test_api_key_auth():
+    request = {"api_key": "api_key_1"}
+    assert authenticate_request("api_key", request) == True
+
+def test_invalid_auth_type():
+    with pytest.raises(ValueError):
+        authenticate_request("invalid_type", {})
+
+def test_failed_authentication():
+    request = {"api_key": "invalid_key"}
+    assert authenticate_request("api_key", request) == False
+
+```
+
+Now, let's update the `requirements.txt` file to include pytest:
+
+```plaintext
+# requirements.txt
+
+PyJWT==2.3.0
+pytest==7.3.1
+
+```
+
+Finally, let's update the README.md file to include instructions for running the tests:
+
+```markdown
+# Pluggable Authentication System
+
+This project implements a pluggable authentication system in Python using the Strategy Design Pattern. It supports four authentication mechanisms: Basic Authentication, Session-Based Authentication, JWT (JSON Web Token) Authentication, and API Key Authentication.
+
+## Project Structure
+
+```
+auth_system/
+│
+├── authenticators/
+│   ├── __init__.py
+│   ├── authenticator_interface.py
+│   ├── basic_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   └── api_key_auth.py
+│
+├── utils/
+│   ├── __init__.py
+│   └── exceptions.py
+│
+├── storage/
+│   ├── __init__.py
+│   └── in_memory_storage.py
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_basic_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   ├── test_api_key_auth.py
+│   ├── test_in_memory_storage.py
+│   └── test_main.py
+│
+├── requirements.txt
+├── main.py
+└── README.md
+```
+
+## Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/auth_system.git
+   cd auth_system
+   ```
+
+2. Create a virtual environment and activate it:
+   ```
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   ```
+
+3. Install the required packages:
+   ```
+   pip install -r requirements.txt
+   ```
+
+## Usage
+
+The `main.py` file demonstrates how to use each authentication strategy. You can run it with:
+
+```
+python main.py
+```
+
+To use a specific authentication strategy in your own code:
+
+1. Import the desired authenticator
+2. Initialize it with the necessary parameters
+3. Call the `authenticate` method with the appropriate request object
+
+Example:
+
+```python
+from authenticators.basic_auth import BasicAuthenticator
+
+users = {"alice": "password123"}
+basic_auth = BasicAuthenticator(users)
+
+request = {
+    "Authorization": "Basic YWxpY2U6cGFzc3dvcmQxMjM="
+}
+
+is_authenticated = basic_auth.authenticate(request)
+print(f"Authenticated: {is_authenticated}")
+```
+
+## Testing
+
+To run the tests, use the following command:
+
+```
+pytest
+```
+
+This will run all the tests in the `tests/` directory and provide a coverage report.
+
+To generate a detailed HTML coverage report, you can use:
+
+```
+pytest --cov=. --cov-report=html
+```
+
+This will create a `htmlcov/` directory with an `index.html` file that you can open in your web browser to see detailed coverage information.
+
+## Contributing
+
+1. Fork the repository
+2. Create a new branch for your feature
+3. Commit your changes
+4. Push to your branch
+5. Create a new Pull Request
+
+## License
+
+This project is licensed under the MIT License.
+
+```
+
+These unit tests provide comprehensive coverage for our pluggable authentication system. They test various scenarios for each authentication strategy, including successful and failed authentication attempts, edge cases, and error handling.
+
+Key points about the tests:
+
+1. We use pytest fixtures to set up the authentication objects for each

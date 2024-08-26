@@ -1,0 +1,387 @@
+### Project Plan
+
+#### Directory Structure
+```
+auth_system/
+├── auth_strategies/
+│   ├── __init__.py
+│   ├── base_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   ├── api_key_auth.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_base_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   ├── test_api_key_auth.py
+├── main.py
+├── requirements.txt
+└── README.md
+```
+
+#### Dependencies
+- `PyJWT` for JWT handling
+- `Flask` for handling HTTP requests (optional, for demonstration purposes)
+- `pytest` for unit testing
+
+#### `requirements.txt`
+```
+PyJWT==2.3.0
+Flask==2.0.2
+pytest==6.2.5
+```
+
+### Implementation
+
+#### `auth_strategies/base_auth.py`
+```python
+import base64
+
+class BaseAuth:
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            raise Exception("Missing Authorization header")
+
+        auth_type, credentials = auth_header.split()
+        if auth_type.lower() != 'basic':
+            raise Exception("Invalid auth type")
+
+        decoded_credentials = base64.b64decode(credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':')
+        
+        # Replace with actual user verification logic
+        if username == 'admin' and password == 'password':
+            return True
+        else:
+            raise Exception("Invalid credentials")
+```
+
+#### `auth_strategies/session_auth.py`
+```python
+import uuid
+
+class SessionAuth:
+    sessions = {}
+
+    def authenticate(self, request):
+        session_id = request.cookies.get('session_id')
+        if not session_id or session_id not in self.sessions:
+            raise Exception("Invalid session")
+
+        return True
+
+    def login(self, username, password):
+        # Replace with actual user verification logic
+        if username == 'admin' and password == 'password':
+            session_id = str(uuid.uuid4())
+            self.sessions[session_id] = username
+            return session_id
+        else:
+            raise Exception("Invalid credentials")
+```
+
+#### `auth_strategies/jwt_auth.py`
+```python
+
+
+import
+
+ jwt
+import datetime
+
+SECRET_KEY = 'your_secret_key'
+
+class JWTAuth:
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            raise Exception("Missing Authorization header")
+
+        auth_type, token = auth_header.split()
+        if auth_type.lower() != 'bearer':
+            raise Exception("Invalid auth type")
+
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            return True
+        except jwt.ExpiredSignatureError:
+            raise Exception("Token expired")
+        except jwt.InvalidTokenError:
+            raise Exception("Invalid token")
+
+    def login(self, username, password):
+        # Replace with actual user verification logic
+        if username == 'admin' and password == 'password':
+            payload = {
+                'username': username,
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+            }
+            token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+            return token
+        else:
+            raise Exception("Invalid credentials")
+```
+
+#### `auth_strategies/api_key_auth.py`
+```python
+class APIKeyAuth:
+    api_keys = {
+        'user1': 'key1',
+        'user2': 'key2'
+    }
+
+    def authenticate(self, request):
+        api_key = request.headers.get('Authorization') or request.args.get('api_key')
+        if not api_key or api_key not in self.api_keys.values():
+            raise Exception("Invalid API key")
+
+        return True
+```
+
+#### `main.py`
+```python
+from flask import Flask, request, jsonify
+from auth_strategies.base_auth import BaseAuth
+from auth_strategies.session_auth import SessionAuth
+from auth_strategies.jwt_auth import JWTAuth
+from auth_strategies.api_key_auth import APIKeyAuth
+
+app = Flask(__name__)
+
+# Initialize authentication strategies
+base_auth = BaseAuth()
+session_auth = SessionAuth()
+jwt_auth = JWTAuth()
+api_key_auth = APIKeyAuth()
+
+# Example route using BaseAuth
+@app.route('/base-auth', methods=['GET'])
+def base_auth_route():
+    try:
+        base_auth.authenticate(request)
+        return jsonify({"message": "Authenticated with Basic Auth"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+# Example route using SessionAuth
+@app.route('/session-auth', methods=['GET'])
+def session_auth_route():
+    try:
+        session_auth.authenticate(request)
+        return jsonify({"message": "Authenticated with Session Auth"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+# Example route using JWTAuth
+@app.route('/jwt-auth', methods=['GET'])
+def jwt_auth_route():
+    try:
+        jwt_auth.authenticate(request)
+        return jsonify({"message": "Authenticated with JWT Auth"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+# Example route using APIKeyAuth
+@app.route('/api-key-auth', methods=['GET'])
+def api_key_auth_route():
+    try:
+        api_key_auth.authenticate(request)
+        return jsonify({"message": "Authenticated with API Key Auth"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+#### Unit Tests
+
+#### `tests/test_base_auth.py`
+```python
+import pytest
+from auth_strategies.base_auth import BaseAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+base_auth = BaseAuth()
+
+@app.route('/test-base-auth', methods=['GET'])
+def test_base_auth_route():
+    try:
+        base_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_base_auth():
+    with app.test_client() as client:
+        headers = {
+            'Authorization': 'Basic YWRtaW46cGFzc3dvcmQ='  # Base64 for 'admin:password'
+        }
+        response = client.get('/test-base-auth', headers=headers)
+        assert response.status_code == 200
+
+        headers = {
+            'Authorization': 'Basic invalid'
+        }
+        response = client.get('/test-base-auth', headers=headers)
+        assert response.status_code == 401
+```
+
+#### `tests/test_session_auth.py`
+```python
+import pytest
+from auth_strategies.session_auth import SessionAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+session_auth = SessionAuth()
+
+@app.route('/test-session-auth', methods=['GET'])
+def test_session_auth_route():
+    try:
+        session_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_session_auth():
+    with app.test_client() as client:
+        session_id = session_auth.login('admin', 'password')
+        cookies = {
+            'session_id': session_id
+        }
+        response = client.get('/test-session-auth', cookies=cookies)
+        assert response.status_code == 200
+
+        response = client.get('/test-session-auth')
+        assert response.status_code == 401
+```
+
+#### `tests/test_jwt_auth.py`
+```python
+import pytest
+from auth_strategies.jwt_auth import JWTAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+jwt_auth = JWTAuth()
+
+@app.route('/test-jwt-auth', methods=['GET'])
+def test_jwt_auth_route():
+    try:
+        jwt_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_jwt_auth():
+    with app.test_client() as client:
+        token = jwt_auth.login('admin', 'password')
+        headers = {
+            'Authorization': f'Bearer {token}'
+        }
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 200
+
+        headers = {
+            'Authorization': 'Bearer invalid'
+        }
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 401
+```
+
+#### `tests/test_api_key_auth.py`
+```python
+import pytest
+from auth_strategies.api_key_auth import APIKeyAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+api_key_auth = APIKeyAuth()
+
+@app.route('/test-api-key-auth', methods=['GET'])
+def test_api_key_auth_route():
+    try:
+        api_key_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_api_key_auth():
+    with app.test_client() as client:
+        headers = {
+            'Authorization': 'key1'
+        }
+        response = client.get('/test-api-key-auth', headers=headers)
+        assert response.status_code == 200
+
+        headers = {
+            'Authorization': 'invalid'
+        }
+        response = client.get('/test-api-key-auth', headers=headers)
+        assert response.status_code == 401
+```
+
+### README.md
+```markdown
+# Authentication System using Strategy Design Pattern
+
+## Project Structure
+```
+auth_system/
+├── auth_strategies/
+│   ├── __init__.py
+│   ├── base_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   ├── api_key_auth.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_base_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   ├── test_api_key_auth.py
+├── main.py
+├── requirements.txt
+└── README.md
+```
+
+## Dependencies
+- `PyJWT==2.3.0`
+- `Flask==2.0.2`
+- `pytest==6.2.5`
+
+## Setup
+1. Install dependencies:
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+2. Run the application:
+    ```sh
+    python main.py
+    ```
+
+3. Run the tests:
+    ```sh
+    pytest tests/
+    ```
+
+## Authentication Strategies
+### Basic Authentication
+- Encodes username and password in Base64 and sends it in the Authorization header.
+
+### Session-Based Authentication
+- Generates a session ID upon successful login and stores it on the server side.
+
+### JWT Authentication
+- Generates a signed JWT token upon successful login and sends it to the client.
+
+### API Key Authentication
+- Uses a unique API key assigned to each user for authentication.
+```
+
+This setup provides a comprehensive authentication system using the Strategy Design Pattern, allowing easy switching between different authentication mechanisms.

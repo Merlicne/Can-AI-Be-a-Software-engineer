@@ -1,0 +1,400 @@
+GitHub Copilot: ### Plan
+
+1. **Project Structure:**
+    ```
+    auth_system/
+    ├── __init__.py
+    ├── main.py
+    ├── strategies/
+    │   ├── __init__.py
+    │   ├── base_auth.py
+    │   ├── session_auth.py
+    │   ├── jwt_auth.py
+    │   ├── api_key_auth.py
+    ├── tests/
+    │   ├── __init__.py
+    │   ├── test_base_auth.py
+    │   ├── test_session_auth.py
+    │   ├── test_jwt_auth.py
+    │   ├── test_api_key_auth.py
+    ├── utils/
+    │   ├── __init__.py
+    │   ├── session_store.py
+    │   ├── jwt_utils.py
+    │   ├── api_key_store.py
+    ├── requirements.txt
+    └── README.md
+    ```
+
+2. **Dependencies:**
+    - `PyJWT` for JWT handling
+    - `Flask` for creating a simple web server to test the authentication strategies
+    - `pytest` for unit testing
+
+3. **Authenticator Interface:**
+    ```python
+    # auth_system/strategies/authenticator.py
+    from abc import ABC, abstractmethod
+
+    class Authenticator(ABC):
+        @abstractmethod
+        def authenticate(self, request):
+            pass
+    ```
+
+4. **Basic Authentication Strategy:**
+    ```python
+    # auth_system/strategies/base_auth.py
+    import base64
+    from .authenticator import Authenticator
+
+    class BasicAuth(Authenticator):
+        def __init__(self, users):
+            self.users = users
+
+        def authenticate(self, request):
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return False
+            auth_type, credentials = auth_header.split()
+            if auth_type.lower() != 'basic':
+                return False
+            decoded_credentials = base64.b64decode(credentials).decode('utf-8')
+            username, password = decoded_credentials.split(':')
+            return self.users.get(username) == password
+    ```
+
+5. **Session-Based Authentication Strategy:**
+    ```python
+    # auth_system/strategies/session_auth.py
+    from .authenticator import Authenticator
+    from ..utils.session_store import SessionStore
+
+    class SessionAuth(Authenticator):
+        def __init__(self, session_store: SessionStore):
+            self.session_store = session_store
+
+        def authenticate(self, request):
+            session_id = request.cookies.get('session_id')
+            if not session_id:
+                return False
+            return self.session_store.validate_session(session_id)
+    ```
+
+6. **JWT Authentication Strategy:**
+    ```python
+    # auth_system/strategies/jwt_auth.py
+    import jwt
+    from .authenticator import Authenticator
+    from ..utils.jwt_utils import JWTUtils
+
+    class JWTAuth(Authenticator):
+        def __init__(self, secret_key):
+            self.secret_key = secret_key
+
+        def authenticate(self, request):
+            auth_header = request.headers.get('Authorization')
+            if not auth_header:
+                return False
+            auth_type, token = auth_header.split()
+            if auth_type.lower() != 'bearer':
+                return False
+            try:
+                payload = jwt.decode(token, self.secret_key, algorithms=['HS256'])
+                return True
+            except jwt.ExpiredSignatureError:
+                return False
+            except jwt.InvalidTokenError:
+                return False
+    ```
+
+7. **API Key Authentication Strategy:**
+    ```python
+    # auth_system/strategies/api_key_auth.py
+    from .authenticator import Authenticator
+    from ..utils.api_key_store import APIKeyStore
+
+    class APIKeyAuth(Authenticator):
+        def __init__(self, api_key_store: APIKeyStore):
+            self.api_key_store = api_key_store
+
+        def authenticate(self, request):
+            api_key = request.headers.get('Authorization') or request.args.get('api_key')
+            if not api_key:
+                return False
+            return self.api_key_store.validate_key(api_key)
+    ```
+
+8. **Main Application:**
+    ```python
+    # auth_system/main.py
+    from flask import Flask, request, jsonify
+    from strategies.base_auth import BasicAuth
+    from strategies.session_auth import SessionAuth
+    from strategies.jwt_auth import JWTAuth
+    from strategies.api_key_auth import APIKeyAuth
+    from utils.session_store import SessionStore
+    from utils.jwt_utils import JWTUtils
+    from utils.api_key_store import APIKeyStore
+
+    app = Flask(__name__)
+
+    # Example users and keys
+    users = {'user1': 'password1', 'user2': 'password2'}
+    session_store = SessionStore()
+    api_key_store = APIKeyStore()
+    jwt_secret = 'your_jwt_secret'
+
+    # Initialize strategies
+    basic_auth = BasicAuth(users)
+    session_auth = SessionAuth(session_store)
+    jwt_auth = JWTAuth(jwt_secret)
+    api_key_auth = APIKeyAuth(api_key_store)
+
+    # Set the current strategy
+    current_strategy = basic_auth
+
+    @app.route('/login', methods=['POST'])
+    def login():
+        if current_strategy.authenticate(request):
+            return jsonify({"message": "Authenticated"}), 200
+        return jsonify({"message": "Unauthorized"}), 401
+
+    if __name__ == '__main__':
+        app.run(debug=True)
+    ```
+
+9. **Unit Tests:**
+    ```python
+    # auth_system/tests/test_base_auth.py
+    import base64
+    from strategies.base_auth import BasicAuth
+
+    def test_basic_auth():
+        users = {'user1': 'password1'}
+        auth = BasicAuth(users)
+        request = type('Request', (object,), {'headers': {'Authorization': 'Basic ' + base64.b64encode(b'user1:password1').decode('utf-8')}})()
+        assert auth.authenticate(request) == True
+
+        request = type('Request', (object,), {'headers': {'Authorization': 'Basic ' + base64.b64encode(b'user1:wrongpassword').decode('utf-8')}})()
+        assert auth.authenticate(request) == False
+    ```
+
+10. **README.md:**
+    ```markdown
+    # Authentication System using Strategy Design Pattern
+
+    ## Project Structure
+    ```
+    (Include the directory structure here)
+
+    ## Dependencies
+    - PyJWT
+    - Flask
+    - pytest
+
+    ## Setup
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    ## Running the Application
+    ```bash
+    python auth_system/main.py
+    ```
+
+    ## Running Tests
+    ```bash
+    pytest
+    ```
+
+    ## Authentication Strategies
+    - Basic Authentication
+    - Session-Based Authentication
+    - JWT Authentication
+    - API Key Authentication
+    ```
+
+### Code
+
+```python
+# auth_system/strategies/authenticator.py
+from abc import ABC, abstractmethod
+
+class Authenticator(ABC):
+    @abstractmethod
+    def authenticate(self, request):
+        pass
+```
+
+```python
+# auth_system/strategies/base_auth.py
+import base64
+from .authenticator import Authenticator
+
+class BasicAuth(Authenticator):
+    def __init__(self, users):
+        self.users = users
+
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return False
+        auth_type, credentials = auth_header.split()
+        if auth_type.lower() != 'basic':
+            return False
+        decoded_credentials = base64.b64decode(credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':')
+        return self.users.get(username) == password
+```
+
+```python
+# auth_system/strategies/session_auth.py
+from .authenticator import Authenticator
+from ..utils.session_store import SessionStore
+
+class SessionAuth(Authenticator):
+    def __init__(self, session_store: SessionStore):
+        self.session_store = session_store
+
+    def authenticate(self, request):
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return False
+        return self.session_store.validate_session(session_id)
+```
+
+```python
+# auth_system/strategies/jwt_auth.py
+import jwt
+from .authenticator import Authenticator
+from ..utils.jwt_utils import JWTUtils
+
+class JWTAuth(Authenticator):
+    def __init__(self, secret_key):
+        self.secret_key = secret_key
+
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return False
+        auth_type, token = auth_header.split()
+        if auth_type.lower() != 'bearer':
+            return False
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=['HS256'])
+            return True
+        except jwt.ExpiredSignatureError:
+            return False
+        except jwt.InvalidTokenError:
+            return False
+```
+
+```python
+# auth_system/strategies/api_key_auth.py
+from .authenticator import Authenticator
+from ..utils.api_key_store import APIKeyStore
+
+class APIKeyAuth(Authenticator):
+    def __init__(self, api_key_store: APIKeyStore):
+        self.api_key_store = api_key_store
+
+    def authenticate(self, request):
+        api_key = request.headers.get('Authorization') or request.args.get('api_key')
+        if not api_key:
+            return False
+        return self.api_key_store.validate_key(api_key)
+```
+
+```python
+# auth_system/main.py
+from flask import Flask, request, jsonify
+from strategies.base_auth import BasicAuth
+from strategies.session_auth import SessionAuth
+from strategies.jwt_auth import JWTAuth
+from strategies.api_key_auth import APIKeyAuth
+from utils.session_store import SessionStore
+from utils.jwt_utils import JWTUtils
+from utils.api_key_store import APIKeyStore
+
+app = Flask(__name__)
+
+#
+
+ Example
+
+ users and keys
+users = {'user1': 'password1', 'user2': 'password2'}
+session_store = SessionStore()
+api_key_store = APIKeyStore()
+jwt_secret = 'your_jwt_secret'
+
+# Initialize strategies
+basic_auth = BasicAuth(users)
+session_auth = SessionAuth(session_store)
+jwt_auth = JWTAuth(jwt_secret)
+api_key_auth = APIKeyAuth(api_key_store)
+
+# Set the current strategy
+current_strategy = basic_auth
+
+@app.route('/login', methods=['POST'])
+def login():
+    if current_strategy.authenticate(request):
+        return jsonify({"message": "Authenticated"}), 200
+    return jsonify({"message": "Unauthorized"}), 401
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+```python
+# auth_system/tests/test_base_auth.py
+import base64
+from strategies.base_auth import BasicAuth
+
+def test_basic_auth():
+    users = {'user1': 'password1'}
+    auth = BasicAuth(users)
+    request = type('Request', (object,), {'headers': {'Authorization': 'Basic ' + base64.b64encode(b'user1:password1').decode('utf-8')}})()
+    assert auth.authenticate(request) == True
+
+    request = type('Request', (object,), {'headers': {'Authorization': 'Basic ' + base64.b64encode(b'user1:wrongpassword').decode('utf-8')}})()
+    assert auth.authenticate(request) == False
+```
+
+```markdown
+# README.md
+
+# Authentication System using Strategy Design Pattern
+
+## Project Structure
+```
+(Include the directory structure here)
+
+## Dependencies
+- PyJWT
+- Flask
+- pytest
+
+## Setup
+```bash
+pip install -r requirements.txt
+```
+
+## Running the Application
+```bash
+python auth_system/main.py
+```
+
+## Running Tests
+```bash
+pytest
+```
+
+## Authentication Strategies
+- Basic Authentication
+- Session-Based Authentication
+- JWT Authentication
+- API Key Authentication
+```
