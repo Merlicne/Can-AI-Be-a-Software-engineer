@@ -1,0 +1,249 @@
+package com.auth.auth;
+
+import com.auth.model.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
+class BasicAuthenticationTest {
+
+    private BasicAuthentication basicAuthentication;
+
+    @BeforeEach
+    void setUp() {
+        basicAuthentication = new BasicAuthentication();
+    }
+
+    @Test
+    void testAuthenticate_ValidCredentials() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Basic dXNlcjpwYXNzd29yZA=="); // Base64 encoded "user:password"
+
+        User user = basicAuthentication.authenticate(request);
+
+        assertNotNull(user);
+        assertEquals("user", user.getUsername());
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentials() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Basic invalid");
+
+        User user = basicAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+
+    @Test
+    void testAuthenticate_MissingAuthorizationHeader() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        User user = basicAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+}
+
+// SessionAuthenticationTest.java
+package com.auth.auth;
+
+import com.auth.model.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
+class SessionAuthenticationTest {
+
+    private SessionAuthentication sessionAuthentication;
+
+    @BeforeEach
+    void setUp() {
+        sessionAuthentication = new SessionAuthentication();
+    }
+
+    @Test
+    void testAuthenticate_ValidSession() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("SESSION_ID")).thenReturn("validSessionId");
+
+        // Assuming a valid session ID exists in your storage mechanism
+        User user = sessionAuthentication.authenticate(request);
+
+        assertNotNull(user);
+    }
+
+    @Test
+    void testAuthenticate_InvalidSession() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("SESSION_ID")).thenReturn("invalidSessionId");
+
+        User user = sessionAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+
+    @Test
+    void testAuthenticate_MissingSessionCookie() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("SESSION_ID")).thenReturn(null);
+
+        User user = sessionAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+}
+
+// JwtAuthenticationTest.java
+package com.auth.auth;
+
+import com.auth.model.User;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
+class JwtAuthenticationTest {
+
+    private JwtAuthentication jwtAuthentication;
+    private String secretKey = "yourSecretKey"; // Replace with your actual secret key
+
+    @BeforeEach
+    void setUp() {
+        jwtAuthentication = new JwtAuthentication();
+    }
+
+    @Test
+    void testAuthenticate_ValidToken() {
+        String token = generateJwtToken("user", new Date(System.currentTimeMillis() + 10000)); // Token valid for 10 seconds
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        User user = jwtAuthentication.authenticate(request);
+
+        assertNotNull(user);
+        assertEquals("user", user.getUsername());
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer invalidToken");
+
+        User user = jwtAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+
+    @Test
+    void testAuthenticate_ExpiredToken() {
+        String token = generateJwtToken("user", new Date(System.currentTimeMillis() - 10000)); // Token expired 10 seconds ago
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        User user = jwtAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+
+    // Helper method to generate JWT token
+    private String generateJwtToken(String username, Date expiration) {
+        return Jwts.builder()
+                .setSubject(username)
+                .setExpiration(expiration)
+                .signWith(SignatureAlgorithm.HS512, secretKey)
+                .compact();
+    }
+}
+
+// ApiKeyAuthenticationTest.java
+package com.auth.auth;
+
+import com.auth.model.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
+class ApiKeyAuthenticationTest {
+
+    private ApiKeyAuthentication apiKeyAuthentication;
+
+    @BeforeEach
+    void setUp() {
+        apiKeyAuthentication = new ApiKeyAuthentication();
+    }
+
+    @Test
+    void testAuthenticate_ValidApiKey() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("API_KEY")).thenReturn("validApiKey");
+
+        // Assuming "validApiKey" exists in your storage
+        User user = apiKeyAuthentication.authenticate(request);
+
+        assertNotNull(user);
+    }
+
+    @Test
+    void testAuthenticate_InvalidApiKey() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("API_KEY")).thenReturn("invalidApiKey");
+
+        User user = apiKeyAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+
+    @Test
+    void testAuthenticate_MissingApiKey() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("API_KEY")).thenReturn(null);
+
+        User user = apiKeyAuthentication.authenticate(request);
+
+        assertNull(user);
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+Explanation:
+
+Test Setup: Each test class has a @BeforeEach method to set up the authentication strategy being tested.
+
+Mocking: We use Mockito to mock the Request object and its methods (e.g., getHeader, getCookie). This allows us to simulate various request scenarios without needing a real HTTP request.
+
+Assertions: Each test uses JUnit's Assertions (e.g., assertNotNull, assertEquals, assertNull) to verify the expected outcomes.
+
+Branch Coverage: The tests are designed to cover different branches in the code:
+
+Valid and invalid credentials/tokens/API keys
+
+Missing headers/cookies
+
+Token expiration (for JWT)
+
+Remember:
+
+Replace placeholders like "validSessionId", "validApiKey", and the JWT secret key with your actual implementation details.
+
+These tests focus on the authentication logic within each strategy. You should also write integration tests to ensure the strategies work correctly within your application context.
+
+Aim for high test coverage, but more importantly, focus on testing critical paths and edge cases in your authentication system.

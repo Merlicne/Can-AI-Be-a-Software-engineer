@@ -1,0 +1,277 @@
+To achieve 100% branch coverage for the pluggable authentication system using the Strategy Design Pattern, we need to ensure that all possible branches (if-else conditions) in the code are tested. Here is an example of how you could write the unit tests using JUnit 5 and Mockito to achieve this for each of the four strategies.
+
+### **Setup**
+First, add Mockito as a dependency to your `pom.xml` to mock HTTP requests:
+
+```xml
+<dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-core</artifactId>
+    <version>3.11.2</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter-api</artifactId>
+    <version>5.7.0</version>
+    <scope>test</scope>
+</dependency>
+```
+
+### **Unit Tests**
+
+#### **1. BasicAuthStrategy Test**
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Base64;
+import javax.servlet.http.HttpServletRequest;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.authsystem.strategies.BasicAuthStrategy;
+
+class BasicAuthStrategyTest {
+
+    private BasicAuthStrategy basicAuthStrategy;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        basicAuthStrategy = new BasicAuthStrategy();
+        request = mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticate_Success() {
+        // Mock a valid Authorization header
+        String credentials = "admin:password";
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes());
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+
+        boolean result = basicAuthStrategy.authenticate(request);
+        assertTrue(result);  // Success case
+    }
+
+    @Test
+    void testAuthenticate_InvalidHeader() {
+        // No Authorization header
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        boolean result = basicAuthStrategy.authenticate(request);
+        assertFalse(result);  // Missing Authorization header
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentials() {
+        // Mock an Authorization header with wrong credentials
+        String credentials = "user:wrongpassword";
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString(credentials.getBytes());
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+
+        boolean result = basicAuthStrategy.authenticate(request);
+        assertFalse(result);  // Invalid credentials case
+    }
+}
+```
+
+#### **2. SessionAuthStrategy Test**
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.authsystem.strategies.SessionAuthStrategy;
+
+class SessionAuthStrategyTest {
+
+    private SessionAuthStrategy sessionAuthStrategy;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        sessionAuthStrategy = new SessionAuthStrategy();
+        request = mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticate_Success() {
+        // Mock a valid session cookie
+        Cookie[] cookies = {new Cookie("SESSIONID", "valid_session")};
+        when(request.getCookies()).thenReturn(cookies);
+
+        boolean result = sessionAuthStrategy.authenticate(request);
+        assertTrue(result);  // Success case
+    }
+
+    @Test
+    void testAuthenticate_MissingCookie() {
+        // No cookies in the request
+        when(request.getCookies()).thenReturn(null);
+
+        boolean result = sessionAuthStrategy.authenticate(request);
+        assertFalse(result);  // Missing cookie case
+    }
+
+    @Test
+    void testAuthenticate_InvalidSession() {
+        // Mock a session cookie with invalid session ID
+        Cookie[] cookies = {new Cookie("SESSIONID", "invalid_session")};
+        when(request.getCookies()).thenReturn(cookies);
+
+        boolean result = sessionAuthStrategy.authenticate(request);
+        assertFalse(result);  // Invalid session ID case
+    }
+}
+```
+
+#### **3. JWTAuthStrategy Test**
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import io.jsonwebtoken.*;
+import javax.servlet.http.HttpServletRequest;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.authsystem.strategies.JWTAuthStrategy;
+
+class JWTAuthStrategyTest {
+
+    private JWTAuthStrategy jwtAuthStrategy;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        jwtAuthStrategy = new JWTAuthStrategy();
+        request = mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticate_Success() {
+        // Mock a valid JWT token
+        String validToken = Jwts.builder()
+                .setSubject("user")
+                .signWith(SignatureAlgorithm.HS256, "secret")
+                .compact();
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + validToken);
+
+        boolean result = jwtAuthStrategy.authenticate(request);
+        assertTrue(result);  // Success case
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken() {
+        // Mock an invalid JWT token
+        when(request.getHeader("Authorization")).thenReturn("Bearer invalidToken");
+
+        boolean result = jwtAuthStrategy.authenticate(request);
+        assertFalse(result);  // Invalid token case
+    }
+
+    @Test
+    void testAuthenticate_MissingHeader() {
+        // No Authorization header
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        boolean result = jwtAuthStrategy.authenticate(request);
+        assertFalse(result);  // Missing header case
+    }
+}
+```
+
+#### **4. APIKeyAuthStrategy Test**
+
+```java
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import javax.servlet.http.HttpServletRequest;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import com.authsystem.strategies.APIKeyAuthStrategy;
+
+class APIKeyAuthStrategyTest {
+
+    private APIKeyAuthStrategy apiKeyAuthStrategy;
+    private HttpServletRequest request;
+
+    @BeforeEach
+    void setUp() {
+        apiKeyAuthStrategy = new APIKeyAuthStrategy();
+        request = mock(HttpServletRequest.class);
+    }
+
+    @Test
+    void testAuthenticate_SuccessHeader() {
+        // Mock a valid API key in the header
+        when(request.getHeader("Authorization")).thenReturn("valid_api_key");
+
+        boolean result = apiKeyAuthStrategy.authenticate(request);
+        assertTrue(result);  // Success case (header)
+    }
+
+    @Test
+    void testAuthenticate_SuccessQueryParameter() {
+        // Mock a valid API key as a query parameter
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getParameter("apiKey")).thenReturn("valid_api_key");
+
+        boolean result = apiKeyAuthStrategy.authenticate(request);
+        assertTrue(result);  // Success case (query parameter)
+    }
+
+    @Test
+    void testAuthenticate_InvalidAPIKey() {
+        // Mock an invalid API key
+        when(request.getHeader("Authorization")).thenReturn("invalid_api_key");
+
+        boolean result = apiKeyAuthStrategy.authenticate(request);
+        assertFalse(result);  // Invalid API key case
+    }
+
+    @Test
+    void testAuthenticate_MissingAPIKey() {
+        // No API key in header or query parameter
+        when(request.getHeader("Authorization")).thenReturn(null);
+        when(request.getParameter("apiKey")).thenReturn(null);
+
+        boolean result = apiKeyAuthStrategy.authenticate(request);
+        assertFalse(result);  // Missing API key case
+    }
+}
+```
+
+### **Test Explanation**
+- **BasicAuthStrategyTest**: Covers cases where:
+  - Credentials are correct (success).
+  - Credentials are wrong (failure).
+  - Authorization header is missing (failure).
+  
+- **SessionAuthStrategyTest**: Covers cases where:
+  - The session ID is valid (success).
+  - The session ID is missing (failure).
+  - The session ID is invalid (failure).
+
+- **JWTAuthStrategyTest**: Covers cases where:
+  - The token is valid (success).
+  - The token is invalid (failure).
+  - The Authorization header is missing (failure).
+
+- **APIKeyAuthStrategyTest**: Covers cases where:
+  - The API key is provided in the header (success).
+  - The API key is provided in the query parameter (success).
+  - The API key is invalid (failure).
+  - The API key is missing (failure).
+
+These tests aim to ensure 100% branch coverage by covering all possible outcomes (both success and failure scenarios) in the strategies.

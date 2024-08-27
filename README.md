@@ -1,5 +1,9 @@
 # AI as a Software Engineer
 
+653380022-2 พันณกร ภูงามเงิน
+653380024-8 วิชชากร บุญประคม
+
+
 This repository is dedicated to an experimental project that explores the potential of AI in software engineering. The primary goal is to determine whether AI can autonomously generate and validate software by taking on two critical roles:
 
 ## Project Objectives

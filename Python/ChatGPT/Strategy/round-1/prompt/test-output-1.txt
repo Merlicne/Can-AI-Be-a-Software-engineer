@@ -1,0 +1,182 @@
+To achieve 100% statement coverage for the pluggable authentication system using the Strategy Design Pattern with `pytest`, you need to write unit tests that cover every line of code in each authentication strategy. Below are the unit tests for each authentication strategy.
+
+### Basic Authentication Tests
+
+Create a file named `test_basic_auth.py` in the `tests` directory:
+
+```python
+# tests/test_basic_auth.py
+import pytest
+from flask import Flask, Request
+from flask.testing import FlaskClient
+from auth_strategies.basic_auth import BasicAuth
+
+@pytest.fixture
+def client():
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+
+    with app.test_client() as client:
+        yield client
+
+@pytest.fixture
+def basic_auth():
+    return BasicAuth()
+
+def test_valid_basic_auth(client, basic_auth):
+    basic_auth.users = {'user1': 'password1'}
+    headers = {
+        'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQx'  # base64 encoded 'user1:password1'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 200
+    assert response.json['message'] == 'You have access'
+
+def test_invalid_basic_auth(client, basic_auth):
+    headers = {
+        'Authorization': 'Basic invalid_credentials'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 401
+    assert response.json['message'] == 'Unauthorized'
+```
+
+### Session-Based Authentication Tests
+
+Create a file named `test_session_auth.py` in the `tests` directory:
+
+```python
+# tests/test_session_auth.py
+import pytest
+from flask import Flask, Request, session
+from flask.testing import FlaskClient
+from auth_strategies.session_auth import SessionAuth
+
+@pytest.fixture
+def client():
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+    app.secret_key = 'super_secret_key'
+
+    with app.test_client() as client:
+        yield client
+
+@pytest.fixture
+def session_auth(client):
+    session_auth = SessionAuth()
+    session_auth.create_session('user1')
+    return session_auth
+
+def test_valid_session_auth(client, session_auth):
+    session_auth.sessions['session_id'] = 'user1'
+    response = client.get('/secure-endpoint', cookies={'session_id': 'session_id'})
+    assert response.status_code == 200
+    assert response.json['message'] == 'You have access'
+
+def test_invalid_session_auth(client):
+    response = client.get('/secure-endpoint', cookies={'session_id': 'invalid_session_id'})
+    assert response.status_code == 401
+    assert response.json['message'] == 'Unauthorized'
+```
+
+### JWT Authentication Tests
+
+Create a file named `test_jwt_auth.py` in the `tests` directory:
+
+```python
+# tests/test_jwt_auth.py
+import pytest
+import jwt
+from flask import Flask, Request
+from flask.testing import FlaskClient
+from auth_strategies.jwt_auth import JWTAuth, SECRET_KEY
+from datetime import datetime, timedelta
+
+@pytest.fixture
+def client():
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+
+    with app.test_client() as client:
+        yield client
+
+@pytest.fixture
+def jwt_auth():
+    return JWTAuth()
+
+def create_jwt_token(user_id, jwt_auth):
+    expiration = datetime.utcnow() + timedelta(hours=1)
+    payload = {
+        'user_id': user_id,
+        'exp': expiration.timestamp()
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+
+def test_valid_jwt_auth(client, jwt_auth):
+    token = create_jwt_token('user1', jwt_auth)
+    headers = {
+        'Authorization': f'Bearer {token}'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 200
+    assert response.json['message'] == 'You have access'
+
+def test_invalid_jwt_auth(client, jwt_auth):
+    headers = {
+        'Authorization': 'Bearer invalid_token'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 401
+    assert response.json['message'] == 'Unauthorized'
+```
+
+### API Key Authentication Tests
+
+Create a file named `test_api_key_auth.py` in the `tests` directory:
+
+```python
+# tests/test_api_key_auth.py
+import pytest
+from flask import Flask, Request
+from flask.testing import FlaskClient
+from auth_strategies.api_key_auth import APIKeyAuth
+
+@pytest.fixture
+def client():
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+
+    with app.test_client() as client:
+        yield client
+
+@pytest.fixture
+def api_key_auth():
+    return APIKeyAuth()
+
+def test_valid_api_key_auth(client, api_key_auth):
+    api_key_auth.api_keys = {'key1': 'user1'}
+    headers = {
+        'Authorization': 'key1'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 200
+    assert response.json['message'] == 'You have access'
+
+def test_invalid_api_key_auth(client, api_key_auth):
+    headers = {
+        'Authorization': 'invalid_key'
+    }
+    response = client.get('/secure-endpoint', headers=headers)
+    assert response.status_code == 401
+    assert response.json['message'] == 'Unauthorized'
+```
+
+### Conclusion
+
+These tests cover each authentication strategy thoroughly, including both valid and invalid cases, ensuring that all branches of the code are executed. Make sure that each test file is executed by `pytest` to verify that the implementation meets the requirements and that all code paths are tested. 
+
+Run the tests using `pytest` with:
+
+```sh
+pytest --maxfail=1 --disable-warnings -q
+```

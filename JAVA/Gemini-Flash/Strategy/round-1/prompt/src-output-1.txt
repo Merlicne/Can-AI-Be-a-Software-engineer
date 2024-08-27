@@ -1,0 +1,358 @@
+Pluggable Authentication System with Strategy Pattern
+
+This document details the implementation of a pluggable authentication system in Java using the Strategy Design Pattern. The system will allow easy switching between different authentication mechanisms: Basic Authentication, Session-Based Authentication, JWT Authentication, and API Key Authentication.
+
+Directory Structure:
+
+auth-system/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── example/
+│   │   │           ├── auth/
+│   │   │           │   ├── AuthStrategy.java
+│   │   │           │   ├── BasicAuthentication.java
+│   │   │           │   ├── SessionAuthentication.java
+│   │   │           │   ├── JwtAuthentication.java
+│   │   │           │   ├── ApiKeyAuthentication.java
+│   │   │           │   ├── AuthenticationManager.java
+│   │   │           └── controllers/
+│   │   │               └── AuthenticationController.java
+│   │   └── resources/
+│   │       └── application.properties
+│   └── test/
+│       └── java/
+│           └── com/
+│               └── example/
+│                   └── auth/
+│                       ├── AuthenticationTest.java
+│                       ├── BasicAuthenticationTest.java
+│                       ├── SessionAuthenticationTest.java
+│                       ├── JwtAuthenticationTest.java
+│                       └── ApiKeyAuthenticationTest.java
+├── pom.xml
+content_copy
+Use code with caution.
+
+Dependencies:
+
+Spring Boot: For dependency management and auto-configuration.
+
+Spring Security: For handling authentication and authorization.
+
+JWT library: For JWT token generation and validation (e.g., io.jsonwebtoken).
+
+Base64 library: For encoding and decoding usernames and passwords (e.g., org.apache.commons.codec.binary.Base64).
+
+Authentication Strategies:
+
+BasicAuthentication:
+
+Class: BasicAuthentication.java
+
+Implementation: Decodes Base64-encoded username and password from the Authorization header, compares against a predefined set of users.
+
+Dependencies: org.apache.commons.codec.binary.Base64
+
+SessionAuthentication:
+
+Class: SessionAuthentication.java
+
+Implementation: Generates a session ID upon successful login, stores it on the server side (e.g., in-memory, database), and returns it as a cookie to the client. Validates the session ID in subsequent requests.
+
+Dependencies: Spring Session (for session management)
+
+JwtAuthentication:
+
+Class: JwtAuthentication.java
+
+Implementation: Generates a signed JWT token upon successful login, sends it to the client. Validates the token in subsequent requests by verifying the signature and expiration.
+
+Dependencies: io.jsonwebtoken
+
+ApiKeyAuthentication:
+
+Class: ApiKeyAuthentication.java
+
+Implementation: Stores API keys in the database or memory. Validates the API key sent in the Authorization header or as a query parameter.
+
+AuthenticationManager:
+
+Class: AuthenticationManager.java
+
+Implementation: Holds the strategy instance and provides a public authenticate(request) method. The strategy implementation is selected based on configuration or user input.
+
+AuthenticationController:
+
+Class: AuthenticationController.java
+
+Implementation: Provides the controller endpoints for authentication. Delegates the authentication process to the AuthenticationManager.
+
+Testing:
+
+Class: AuthenticationTest.java (for general tests)
+
+Class: BasicAuthenticationTest.java, SessionAuthenticationTest.java, JwtAuthenticationTest.java, ApiKeyAuthenticationTest.java (for specific strategy tests)
+
+Detailed Implementation:
+
+AuthStrategy.java:
+
+package com.example.auth;
+
+import javax.servlet.http.HttpServletRequest;
+
+public interface AuthStrategy {
+    boolean authenticate(HttpServletRequest request);
+}
+content_copy
+Use code with caution.
+Java
+
+BasicAuthentication.java:
+
+package com.example.auth;
+
+import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.codec.binary.Base64;
+
+public class BasicAuthentication implements AuthStrategy {
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Basic ")) {
+            String encodedCredentials = authHeader.substring("Basic ".length()).trim();
+            String credentials = new String(Base64.decodeBase64(encodedCredentials));
+            String[] parts = credentials.split(":");
+            if (parts.length == 2) {
+                String username = parts[0];
+                String password = parts[1];
+                // Compare username and password with predefined credentials
+                return validateCredentials(username, password);
+            }
+        }
+        return false;
+    }
+
+    private boolean validateCredentials(String username, String password) {
+        // Implement credential validation logic
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+SessionAuthentication.java:
+
+package com.example.auth;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+
+public class SessionAuthentication implements AuthStrategy {
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            // Validate session ID against stored session on the server
+            return validateSession(session.getId());
+        }
+        return false;
+    }
+
+    private boolean validateSession(String sessionId) {
+        // Implement session validation logic
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+JwtAuthentication.java:
+
+package com.example.auth;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import javax.servlet.http.HttpServletRequest;
+import java.util.Date;
+
+public class JwtAuthentication implements AuthStrategy {
+
+    private String secretKey; // Secret key for JWT token signing
+
+    public JwtAuthentication(String secretKey) {
+        this.secretKey = secretKey;
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring("Bearer ".length()).trim();
+            try {
+                Claims claims = Jwts.parser()
+                        .setSigningKey(secretKey)
+                        .parseClaimsJws(token)
+                        .getBody();
+                // Check if token has not expired
+                if (claims.getExpiration().after(new Date())) {
+                    // Perform additional validation if needed
+                    return true;
+                }
+            } catch (Exception ex) {
+                // Token invalid or expired
+            }
+        }
+        return false;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+ApiKeyAuthentication.java:
+
+package com.example.auth;
+
+import javax.servlet.http.HttpServletRequest;
+
+public class ApiKeyAuthentication implements AuthStrategy {
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String apiKey = request.getHeader("Authorization");
+        if (apiKey == null) {
+            apiKey = request.getParameter("apiKey");
+        }
+        if (apiKey != null) {
+            // Validate the API key against stored keys
+            return validateApiKey(apiKey);
+        }
+        return false;
+    }
+
+    private boolean validateApiKey(String apiKey) {
+        // Implement API key validation logic
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+AuthenticationManager.java:
+
+package com.example.auth;
+
+import javax.servlet.http.HttpServletRequest;
+
+public class AuthenticationManager {
+
+    private AuthStrategy strategy;
+
+    public AuthenticationManager(AuthStrategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public boolean authenticate(HttpServletRequest request) {
+        return strategy.authenticate(request);
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+AuthenticationController.java:
+
+package com.example.auth.controllers;
+
+import com.example.auth.AuthenticationManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import javax.servlet.http.HttpServletRequest;
+
+@RestController
+public class AuthenticationController {
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @GetMapping("/secure")
+    public String secureEndpoint(HttpServletRequest request) {
+        if (authenticationManager.authenticate(request)) {
+            return "Authenticated";
+        }
+        return "Unauthorized";
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+Application Properties:
+
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect
+
+# JWT Secret Key
+jwt.secret=your-secret-key
+content_copy
+Use code with caution.
+
+Testing:
+
+The testing classes will contain unit tests for each authentication strategy, verifying successful and unsuccessful authentication scenarios. For example:
+
+BasicAuthenticationTest.java:
+
+package com.example.auth;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.mock.web.MockHttpServletRequest;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+class BasicAuthenticationTest {
+
+    @Autowired
+    private BasicAuthentication basicAuthentication;
+
+    @Test
+    void testAuthenticate_success() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        String encodedCredentials = "Basic " + Base64.encodeBase64String("user:password".getBytes());
+        request.addHeader(HttpHeaders.AUTHORIZATION, encodedCredentials);
+        assertTrue(basicAuthentication.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_failure() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Basic " + Base64.encodeBase64String("wronguser:password".getBytes()));
+        assertFalse(basicAuthentication.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+pom.xml:
+
+<project>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+content_copy
+Use code with caution.
+Xml

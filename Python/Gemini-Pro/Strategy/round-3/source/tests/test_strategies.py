@@ -1,0 +1,189 @@
+# tests/test_strategies.py
+
+import base64
+import jwt
+from datetime import datetime, timedelta
+
+import pytest
+from flask import Flask, request, jsonify
+
+from auth.strategies import (
+    BasicAuthenticationStrategy,
+    SessionAuthenticationStrategy,
+    JWTAuthenticationStrategy,
+    APIKeyAuthenticationStrategy,
+)
+
+
+# Mock data for testing
+TEST_USERS = {"user1": "pass1", "user2": "pass2"}
+TEST_API_KEYS = {"key1": "user1", "key2": "user2"}
+SECRET_KEY = "test_secret"
+
+
+# ------------------------
+# Helper functions for tests
+# ------------------------
+
+def create_basic_auth_header(username, password):
+    credentials = f"{username}:{password}".encode("utf-8")
+    auth_header = f"Basic {base64.b64encode(credentials).decode('utf-8')}"
+    return auth_header
+
+
+def generate_test_jwt_token(user, secret_key=SECRET_KEY):
+    payload = {
+        "user": user,
+        "exp": datetime.utcnow() + timedelta(minutes=30),
+    }
+    token = jwt.encode(payload, secret_key, algorithm="HS256")
+    return token
+
+
+# ------------------------
+# Test Fixtures
+# ------------------------
+
+@pytest.fixture
+def app():
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    return app
+
+
+@pytest.fixture
+def basic_auth_strategy():
+    return BasicAuthenticationStrategy(users=TEST_USERS)
+
+
+@pytest.fixture
+def session_auth_strategy():
+    class MockSessionManager:
+        def __init__(self):
+            self.sessions = {}
+
+        def create_session(self, user):
+            session_id = str(len(self.sessions) + 1)
+            self.sessions[session_id] = user
+            return session_id
+
+        def get_session(self, session_id):
+            return self.sessions.get(session_id)
+
+    return SessionAuthenticationStrategy(session_manager=MockSessionManager())
+
+
+@pytest.fixture
+def jwt_auth_strategy():
+    return JWTAuthenticationStrategy(secret_key=SECRET_KEY)
+
+
+@pytest.fixture
+def api_key_auth_strategy():
+    return APIKeyAuthenticationStrategy(api_keys=TEST_API_KEYS)
+
+
+# ------------------------
+# Test Cases
+# ------------------------
+
+# --- Basic Authentication Strategy Tests ---
+
+def test_basic_auth_success(basic_auth_strategy):
+    with app.test_request_context(headers={"Authorization": create_basic_auth_header("user1", "pass1")}):
+        user = basic_auth_strategy.authenticate(request)
+        assert user == "user1"
+
+
+def test_basic_auth_invalid_credentials(basic_auth_strategy):
+    with app.test_request_context(headers={"Authorization": create_basic_auth_header("user1", "wrong_pass")}):
+        user = basic_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_basic_auth_missing_header(basic_auth_strategy):
+    with app.test_request_context():
+        user = basic_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_basic_auth_invalid_header(basic_auth_strategy):
+    with app.test_request_context(headers={"Authorization": "InvalidHeader"}):
+        user = basic_auth_strategy.authenticate(request)
+        assert user is None
+
+
+# --- Session Authentication Strategy Tests ---
+
+def test_session_auth_success(session_auth_strategy):
+    session_id = session_auth_strategy.session_manager.create_session("user1")
+    with app.test_request_context(cookies={"session_id": session_id}):
+        user = session_auth_strategy.authenticate(request)
+        assert user == "user1"
+
+
+def test_session_auth_invalid_session(session_auth_strategy):
+    with app.test_request_context(cookies={"session_id": "invalid_session"}):
+        user = session_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_session_auth_missing_cookie(session_auth_strategy):
+    with app.test_request_context():
+        user = session_auth_strategy.authenticate(request)
+        assert user is None
+
+
+# --- JWT Authentication Strategy Tests ---
+
+def test_jwt_auth_success(jwt_auth_strategy):
+    token = generate_test_jwt_token("user1")
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
+        user = jwt_auth_strategy.authenticate(request)
+        assert user == "user1"
+
+
+def test_jwt_auth_expired_token(jwt_auth_strategy):
+    payload = {"user": "user1", "exp": datetime.utcnow() - timedelta(minutes=30)}
+    token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+    with app.test_request_context(headers={"Authorization": f"Bearer {token}"}):
+        user = jwt_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_jwt_auth_invalid_token(jwt_auth_strategy):
+    with app.test_request_context(headers={"Authorization": "Bearer invalid_token"}):
+        user = jwt_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_jwt_auth_missing_header(jwt_auth_strategy):
+    with app.test_request_context():
+        user = jwt_auth_strategy.authenticate(request)
+        assert user is None
+
+
+# --- API Key Authentication Strategy Tests ---
+
+def test_api_key_auth_header_success(api_key_auth_strategy):
+    with app.test_request_context(headers={"X-API-Key": "key1"}):
+        user = api_key_auth_strategy.authenticate(request)
+        assert user == "user1"
+
+
+def test_api_key_auth_query_param_success(api_key_auth_strategy):
+    with app.test_request_context(query_string={"api_key": "key2"}):
+        user = api_key_auth_strategy.authenticate(request)
+        assert user == "user2"
+
+
+def test_api_key_auth_invalid_key(api_key_auth_strategy):
+    with app.test_request_context(headers={"X-API-Key": "invalid_key"}):
+        user = api_key_auth_strategy.authenticate(request)
+        assert user is None
+
+
+def test_api_key_auth_missing_key(api_key_auth_strategy):
+    with app.test_request_context():
+        user = api_key_auth_strategy.authenticate(request)
+        assert user is None

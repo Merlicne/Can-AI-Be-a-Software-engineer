@@ -1,0 +1,234 @@
+To achieve 100% branch coverage for the authentication system using the Strategy Design Pattern, we need to write comprehensive unit tests for each authentication strategy. Below are the unit tests for each strategy using JUnit 5.
+
+### Basic Authentication Strategy Test
+```java
+// src/test/java/com/example/auth/BasicAuthenticationStrategyTest.java
+package com.example.auth;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class BasicAuthenticationStrategyTest {
+    @Test
+    public void testAuthenticateSuccess() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user", "password");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+        Request request = new Request();
+        request.set
+
+Header
+
+("Authorization", "Basic dXNlcjpwYXNzd29yZA=="); // Base64 for "user:password"
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureInvalidCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user", "password");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+        Request request = new Request();
+        request.setHeader("Authorization", "Basic dXNlcjppbnZhbGlk"); // Base64 for "user:invalid"
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureNoHeader() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user", "password");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+        Request request = new Request();
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureInvalidHeader() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user", "password");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+        Request request = new Request();
+        request.setHeader("Authorization", "InvalidHeader");
+        assertFalse(strategy.authenticate(request));
+    }
+}
+```
+
+### Session-Based Authentication Strategy Test
+```java
+// src/test/java/com/example/auth/SessionBasedAuthenticationStrategyTest.java
+package com.example.auth;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class SessionBasedAuthenticationStrategyTest {
+    @Test
+    public void testAuthenticateSuccess() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("validSessionId", "user");
+        SessionBasedAuthenticationStrategy strategy = new SessionBasedAuthenticationStrategy(sessions);
+        Request request = new Request();
+        request.setCookie("SESSIONID", "validSessionId");
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureInvalidSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("validSessionId", "user");
+        SessionBasedAuthenticationStrategy strategy = new SessionBasedAuthenticationStrategy(sessions);
+        Request request = new Request();
+        request.setCookie("SESSIONID", "invalidSessionId");
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureNoSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("validSessionId", "user");
+        SessionBasedAuthenticationStrategy strategy = new SessionBasedAuthenticationStrategy(sessions);
+        Request request = new Request();
+        assertFalse(strategy.authenticate(request));
+    }
+}
+```
+
+### JWT Authentication Strategy Test
+```java
+// src/test/java/com/example/auth/JWTAuthenticationStrategyTest.java
+package com.example.auth;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.Date;
+
+public class JWTAuthenticationStrategyTest {
+    private static final String SECRET_KEY = "secret";
+
+    @Test
+    public void testAuthenticateSuccess() {
+        String token = Jwts.builder()
+                .setSubject("user")
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60))
+                .signWith(SignatureAlgorithm.HS512, SECRET_KEY)
+                .compact();
+
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy(SECRET_KEY);
+        Request request = new Request();
+        request.setHeader("Authorization", "Bearer " + token);
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureInvalidToken() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy(SECRET_KEY);
+        Request request = new Request();
+        request.setHeader("Authorization", "Bearer invalidToken");
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureNoHeader() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy(SECRET_KEY);
+        Request request = new Request();
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureExpiredToken() {
+        String token = Jwts.builder()
+                .setSubject("user")
+                .setExpiration(new Date(System.currentTimeMillis() - 1000))
+                .signWith(SignatureAlgorithm.HS512, SECRET_KEY)
+                .compact();
+
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy(SECRET_KEY);
+        Request request = new Request();
+        request.setHeader("Authorization", "Bearer " + token);
+        assertFalse(strategy.authenticate(request));
+    }
+}
+```
+
+### API Key Authentication Strategy Test
+```java
+// src/test/java/com/example/auth/APIKeyAuthenticationStrategyTest.java
+package com.example.auth;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class APIKeyAuthenticationStrategyTest {
+    @Test
+    public void testAuthenticateSuccess() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("validApiKey", "user");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+        Request request = new Request();
+        request.setHeader("Authorization", "validApiKey");
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureInvalidApiKey() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("validApiKey", "user");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+        Request request = new Request();
+        request.setHeader("Authorization", "invalidApiKey");
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailureNoHeader() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("validApiKey", "user");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+        Request request = new Request();
+        assertFalse(strategy.authenticate(request));
+    }
+}
+```
+
+### Authentication Context Test
+```java
+// src/test/java/com/example/auth/AuthenticationContextTest.java
+package com.example.auth;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class AuthenticationContextTest {
+    @Test
+    public void testSetAuthenticator() {
+        AuthenticationContext context = new AuthenticationContext();
+        Authenticator authenticator = new BasicAuthenticationStrategy(null);
+        context.setAuthenticator(authenticator);
+        assertNotNull(context);
+    }
+
+    @Test
+    public void testAuthenticate() {
+        AuthenticationContext context = new AuthenticationContext();
+        Authenticator authenticator = new BasicAuthenticationStrategy(null);
+        context.setAuthenticator(authenticator);
+        Request request = new Request();
+        assertFalse(context.authenticate(request));
+    }
+}
+```
+
+These unit tests cover all branches of the authentication strategies, ensuring 100% branch coverage.

@@ -1,0 +1,41 @@
+Mini Project: Pluggable Authentication System Using the Strategy Design Pattern in Java
+
+Objective: Implement a pluggable authentication system in Java using the Strategy Design Pattern. This system should allow easy switching between different authentication mechanisms: Basic Authentication, Session-Based Authentication, JWT (JSON Web Token) Authentication, and API Key Authentication. Each strategy will be encapsulated in its own class and interchangeable within the application.
+
+Project Requirements:
+Basic Authentication Strategy
+
+Description: Implement a Basic Authentication strategy where the client sends a username and password with every request using the HTTP Authorization header.
+Details:
+Verify the credentials on each request by decoding the Base64-encoded username and password.
+Authenticate the user by comparing against a predefined set of users.
+Session-Based Authentication Strategy
+
+Description: Create a session-based authentication system where the server generates a session ID upon successful login.
+Details:
+The session ID should be stored on the server side (e.g., in-memory storage, database) and returned to the client as a cookie.
+The client must include the session cookie in subsequent requests to maintain the authenticated state.
+Validate each request by checking the session ID against the stored session on the server.
+JWT (JSON Web Token) Authentication Strategy
+
+Description: Implement a stateless JWT authentication system.
+Details:
+Generate a signed JWT token after successful login and send it to the client.
+The client must include the token in the Authorization header with each request.
+On each request, validate the token by verifying its signature and ensuring it has not expired.
+API Key Authentication Strategy
+
+Description: Implement API Key Authentication where each user is assigned a unique API key.
+Details:
+The client must include this API key in the Authorization header or as a query parameter with every request.
+On the server side, verify the key’s validity against stored API keys in the database or memory.
+Guidelines:
+Design:
+
+Use the Strategy Design Pattern to decouple the authentication mechanisms from the main application logic.
+The Authenticator interface should define a common method (e.g., authenticate(request)), which will be implemented by each authentication strategy.
+The main application should be able to switch between different authentication strategies without modifying its core logic.
+Testing:
+
+Write unit tests to verify each authentication strategy.
+Ensure proper exception handling for invalid authentication attempts.

@@ -1,0 +1,389 @@
+Certainly! I'll create comprehensive unit tests using pytest for each component of our pluggable authentication system. These tests will aim to provide 100% statement coverage. Let's go through each component and create the corresponding test file.
+
+
+
+1. Test Basic Authentication (tests/test_basic_auth.py):
+
+```python
+import base64
+import pytest
+from flask import Request
+from auth.basic_auth import BasicAuthenticator
+
+@pytest.fixture
+def users():
+    return {
+        'user1': 'password1',
+        'user2': 'password2'
+    }
+
+@pytest.fixture
+def basic_auth(users):
+    return BasicAuthenticator(users)
+
+def test_valid_authentication(basic_auth):
+    credentials = base64.b64encode(b'user1:password1').decode('utf-8')
+    headers = {'Authorization': f'Basic {credentials}'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == True
+
+def test_invalid_authentication(basic_auth):
+    credentials = base64.b64encode(b'user1:wrongpassword').decode('utf-8')
+    headers = {'Authorization': f'Basic {credentials}'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == False
+
+def test_missing_authorization_header(basic_auth):
+    request = Request.from_values()
+    
+    assert basic_auth.authenticate(request) == False
+
+def test_invalid_authorization_header(basic_auth):
+    headers = {'Authorization': 'Invalid'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == False
+
+def test_non_basic_auth_header(basic_auth):
+    headers = {'Authorization': 'Bearer token'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == False
+
+def test_invalid_base64_encoding(basic_auth):
+    headers = {'Authorization': 'Basic invalid_base64'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == False
+
+def test_missing_colon_in_credentials(basic_auth):
+    credentials = base64.b64encode(b'invalidcredentials').decode('utf-8')
+    headers = {'Authorization': f'Basic {credentials}'}
+    request = Request.from_values(headers=headers)
+    
+    assert basic_auth.authenticate(request) == False
+
+```
+
+2. Test Session-Based Authentication (tests/test_session_auth.py):
+
+
+
+```python
+import pytest
+from flask import Request, session
+from auth.session_auth import SessionAuthenticator
+
+@pytest.fixture
+def users():
+    return {
+        'user1': 'password1',
+        'user2': 'password2'
+    }
+
+@pytest.fixture
+def session_auth(users):
+    return SessionAuthenticator(users)
+
+def test_valid_authentication(session_auth):
+    session_id = session_auth.login('user1', 'password1')
+    with session.Session() as sess:
+        sess['session_id'] = session_id
+        request = Request.from_values()
+        request.environ['werkzeug.session'] = sess
+        
+        assert session_auth.authenticate(request) == True
+
+def test_invalid_authentication(session_auth):
+    with session.Session() as sess:
+        sess['session_id'] = 'invalid_session_id'
+        request = Request.from_values()
+        request.environ['werkzeug.session'] = sess
+        
+        assert session_auth.authenticate(request) == False
+
+def test_missing_session_id(session_auth):
+    request = Request.from_values()
+    request.environ['werkzeug.session'] = session.Session()
+    
+    assert session_auth.authenticate(request) == False
+
+def test_valid_login(session_auth):
+    session_id = session_auth.login('user1', 'password1')
+    assert session_id is not None
+    assert session_id in session_auth.sessions
+
+def test_invalid_login(session_auth):
+    session_id = session_auth.login('user1', 'wrongpassword')
+    assert session_id is None
+
+def test_logout(session_auth):
+    session_id = session_auth.login('user1', 'password1')
+    assert session_id in session_auth.sessions
+    
+    session_auth.logout(session_id)
+    assert session_id not in session_auth.sessions
+
+def test_logout_invalid_session(session_auth):
+    session_auth.logout('invalid_session_id')
+    # Should not raise an exception
+
+```
+
+3. Test JWT Authentication (tests/test_jwt_auth.py):
+
+
+
+```python
+import pytest
+import jwt
+from flask import Request
+from auth.jwt_auth import JWTAuthenticator
+from datetime import datetime, timedelta
+
+@pytest.fixture
+def secret_key():
+    return 'test_secret_key'
+
+@pytest.fixture
+def users():
+    return {
+        'user1': 'password1',
+        'user2': 'password2'
+    }
+
+@pytest.fixture
+def jwt_auth(secret_key, users):
+    return JWTAuthenticator(secret_key, users)
+
+def test_valid_authentication(jwt_auth):
+    token = jwt_auth.generate_token('user1', 'password1')
+    headers = {'Authorization': f'Bearer {token}'}
+    request = Request.from_values(headers=headers)
+    
+    assert jwt_auth.authenticate(request) == True
+
+def test_invalid_authentication(jwt_auth):
+    headers = {'Authorization': 'Bearer invalid_token'}
+    request = Request.from_values(headers=headers)
+    
+    assert jwt_auth.authenticate(request) == False
+
+def test_missing_authorization_header(jwt_auth):
+    request = Request.from_values()
+    
+    assert jwt_auth.authenticate(request) == False
+
+def test_non_bearer_token(jwt_auth):
+    headers = {'Authorization': 'Basic token'}
+    request = Request.from_values(headers=headers)
+    
+    assert jwt_auth.authenticate(request) == False
+
+def test_expired_token(jwt_auth, secret_key):
+    payload = {
+        'username': 'user1',
+        'exp': datetime.utcnow() - timedelta(hours=1)
+    }
+    expired_token = jwt.encode(payload, secret_key, algorithm='HS256')
+    headers = {'Authorization': f'Bearer {expired_token}'}
+    request = Request.from_values(headers=headers)
+    
+    assert jwt_auth.authenticate(request) == False
+
+def test_invalid_signature(jwt_auth):
+    payload = {
+        'username': 'user1',
+        'exp': datetime.utcnow() + timedelta(hours=1)
+    }
+    invalid_token = jwt.encode(payload, 'wrong_secret', algorithm='HS256')
+    headers = {'Authorization': f'Bearer {invalid_token}'}
+    request = Request.from_values(headers=headers)
+    
+    assert jwt_auth.authenticate(request) == False
+
+def test_generate_valid_token(jwt_auth):
+    token = jwt_auth.generate_token('user1', 'password1')
+    assert token is not None
+    
+    payload = jwt.decode(token, jwt_auth.secret_key, algorithms=['HS256'])
+    assert payload['username'] == 'user1'
+
+def test_generate_invalid_token(jwt_auth):
+    token = jwt_auth.generate_token('user1', 'wrongpassword')
+    assert token is None
+
+```
+
+4. Test API Key Authentication (tests/test_api_key_auth.py):
+
+
+
+```python
+import pytest
+from flask import Request
+from auth.api_key_auth import APIKeyAuthenticator
+
+@pytest.fixture
+def api_keys():
+    return ['key1', 'key2', 'key3']
+
+@pytest.fixture
+def api_key_auth(api_keys):
+    return APIKeyAuthenticator(api_keys)
+
+def test_valid_header_authentication(api_key_auth):
+    headers = {'X-API-Key': 'key1'}
+    request = Request.from_values(headers=headers)
+    
+    assert api_key_auth.authenticate(request) == True
+
+def test_valid_query_param_authentication(api_key_auth):
+    request = Request.from_values(query_string='api_key=key2')
+    
+    assert api_key_auth.authenticate(request) == True
+
+def test_invalid_api_key(api_key_auth):
+    headers = {'X-API-Key': 'invalid_key'}
+    request = Request.from_values(headers=headers)
+    
+    assert api_key_auth.authenticate(request) == False
+
+def test_missing_api_key(api_key_auth):
+    request = Request.from_values()
+    
+    assert api_key_auth.authenticate(request) == False
+
+def test_empty_api_key(api_key_auth):
+    headers = {'X-API-Key': ''}
+    request = Request.from_values(headers=headers)
+    
+    assert api_key_auth.authenticate(request) == False
+
+def test_header_priority_over_query_param(api_key_auth):
+    headers = {'X-API-Key': 'key1'}
+    request = Request.from_values(headers=headers, query_string='api_key=invalid_key')
+    
+    assert api_key_auth.authenticate(request) == True
+
+```
+
+5. Test Main Application (tests/test_main.py):
+
+
+
+```python
+import pytest
+import json
+import base64
+from main import app
+
+@pytest.fixture
+def client():
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        yield client
+
+def test_protected_route_no_auth(client):
+    response = client.get('/protected')
+    assert response.status_code == 401
+    assert json.loads(response.data)['message'] == 'Access denied'
+
+def test_protected_route_basic_auth(client):
+    credentials = base64.b64encode(b'user1:password1').decode('utf-8')
+    headers = {'Authorization': f'Basic {credentials}'}
+    response = client.get('/protected', headers=headers)
+    assert response.status_code == 200
+    assert json.loads(response.data)['message'] == 'Access granted'
+
+def test_protected_route_session_auth(client):
+    # First, login to get a session
+    login_response = client.post('/login', json={'username': 'user1', 'password': 'password1'})
+    assert login_response.status_code == 200
+    session_id = json.loads(login_response.data)['session_id']
+    
+    # Then, access protected route with session
+    with client.session_transaction() as sess:
+        sess['session_id'] = session_id
+    response = client.get('/protected')
+    assert response.status_code == 200
+    assert json.loads(response.data)['message'] == 'Access granted'
+
+def test_protected_route_jwt_auth(client):
+    # First, login to get a JWT token
+    login_response = client.post('/login', json={'username': 'user1', 'password': 'password1'})
+    assert login_response.status_code == 200
+    jwt_token = json.loads(login_response.data)['jwt_token']
+    
+    # Then, access protected route with JWT token
+    headers = {'Authorization': f'Bearer {jwt_token}'}
+    response = client.get('/protected', headers=headers)
+    assert response.status_code == 200
+    assert json.loads(response.data)['message'] == 'Access granted'
+
+def test_protected_route_api_key_auth(client):
+    headers = {'X-API-Key': 'key1'}
+    response = client.get('/protected', headers=headers)
+    assert response.status_code == 200
+    assert json.loads(response.data)['message'] == 'Access granted'
+
+def test_login_valid_credentials(client):
+    response = client.post('/login', json={'username': 'user1', 'password': 'password1'})
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert 'session_id' in data
+    assert 'jwt_token' in data
+
+def test_login_invalid_credentials(client):
+    response = client.post('/login', json={'username': 'user1', 'password': 'wrongpassword'})
+    assert response.status_code == 401
+    assert json.loads(response.data)['message'] == 'Invalid credentials'
+
+def test_logout(client):
+    # First, login to get a session
+    login_response = client.post('/login', json={'username': 'user1', 'password': 'password1'})
+    assert login_response.status_code == 200
+    session_id = json.loads(login_response.data)['session_id']
+    
+    # Then, logout
+    logout_response = client.post('/logout', json={'session_id': session_id})
+    assert logout_response.status_code == 200
+    assert json.loads(logout_response.data)['message'] == 'Logged out successfully'
+    
+    # Verify that the session is no longer valid
+    with client.session_transaction() as sess:
+        sess['session_id'] = session_id
+    response = client.get('/protected')
+    assert response.status_code == 401
+
+```
+
+These comprehensive test suites cover all the authentication strategies and the main application. They aim to provide 100% statement coverage by testing various scenarios, including:
+
+1. Valid and invalid authentication attempts
+2. Edge cases (missing headers, invalid tokens, etc.)
+3. Different authentication methods (Basic, Session, JWT, API Key)
+4. Login and logout functionality
+5. Protected route access with different authentication methods
+
+To run these tests and check the coverage, you can use pytest with the pytest-cov plugin. Here's how you can do it:
+
+1. First, install pytest-cov if you haven't already:
+   ```
+   pip install pytest-cov
+   ```
+
+2. Run the tests with coverage:
+   ```
+   pytest --cov=auth --cov=main tests/
+   ```
+
+This command will run all the tests and provide a coverage report for the `auth` package and the `main.py` file.
+
+To ensure 100% statement coverage, you may need to run the tests and then review the coverage report. If there are any lines that are not covered, you can add additional test cases to cover those specific scenarios.
+
+Remember that while 100% statement coverage is a good goal, it doesn't guarantee that all possible scenarios are tested. It's always a good idea to also consider edge cases and potential real-world usage scenarios when designing your tests.
+
+Would you like me to explain any part of these tests in more detail or help with any specific testing scenarios?

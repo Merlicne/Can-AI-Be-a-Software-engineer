@@ -1,0 +1,135 @@
+### Unit Tests for 100% Statement Coverage
+
+#### [`tests/test_basic_authentication.py`](command:_github.copilot.openSymbolFromReferences?%5B%22tests%2Ftest_basic_authentication.py%22%2C%5B%7B%22uri%22%3A%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22d%3A%5C%5CsomethingIdroppedin%5C%5CSQA%5C%5CCan-AI-Be-a-Software-engineer%5C%5CPython%5C%5CGitHub-Copilot%5C%5CStrategy%5C%5Cround-3%5C%5Cprompt%5C%5Ctest-promt-1.txt%22%2C%22_sep%22%3A1%2C%22external%22%3A%22file%3A%2F%2F%2Fd%253A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22path%22%3A%22%2FD%3A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22scheme%22%3A%22file%22%7D%2C%22pos%22%3A%7B%22line%22%3A0%2C%22character%22%3A12%7D%7D%5D%5D "Go to definition")
+
+```python
+import pytest
+from auth_strategies.basic_authentication import BasicAuthentication
+
+def test_basic_authentication_success
+
+():
+
+
+    users = {'user1': 'password1'}
+    basic_auth = BasicAuthentication(users)
+    request = type('Request', (object,), {'headers': {'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQx'}})()
+    assert basic_auth.authenticate(request) == True
+
+def test_basic_authentication_no_header():
+    users = {'user1': 'password1'}
+    basic_auth = BasicAuthentication(users)
+    request = type('Request', (object,), {'headers': {}})()
+    assert basic_auth.authenticate(request) == False
+
+def test_basic_authentication_invalid_auth_type():
+    users = {'user1': 'password1'}
+    basic_auth = BasicAuthentication(users)
+    request = type('Request', (object,), {'headers': {'Authorization': 'Bearer dXNlcjE6cGFzc3dvcmQx'}})()
+    assert basic_auth.authenticate(request) == False
+
+def test_basic_authentication_invalid_credentials():
+    users = {'user1': 'password1'}
+    basic_auth = BasicAuthentication(users)
+    request = type('Request', (object,), {'headers': {'Authorization': 'Basic invalid'}})()
+    assert basic_auth.authenticate(request) == False
+```
+
+#### [`tests/test_session_authentication.py`](command:_github.copilot.openSymbolFromReferences?%5B%22tests%2Ftest_session_authentication.py%22%2C%5B%7B%22uri%22%3A%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22d%3A%5C%5CsomethingIdroppedin%5C%5CSQA%5C%5CCan-AI-Be-a-Software-engineer%5C%5CPython%5C%5CGitHub-Copilot%5C%5CStrategy%5C%5Cround-3%5C%5Cprompt%5C%5Ctest-promt-1.txt%22%2C%22_sep%22%3A1%2C%22external%22%3A%22file%3A%2F%2F%2Fd%253A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22path%22%3A%22%2FD%3A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22scheme%22%3A%22file%22%7D%2C%22pos%22%3A%7B%22line%22%3A0%2C%22character%22%3A12%7D%7D%5D%5D "Go to definition")
+
+```python
+import pytest
+from auth_strategies.session_authentication import SessionAuthentication
+
+def test_session_authentication_success():
+    session_auth = SessionAuthentication()
+    session_id = session_auth.login('user1')
+    request = type('Request', (object,), {'cookies': {'session_id': session_id}})()
+    assert session_auth.authenticate(request) == True
+
+def test_session_authentication_no_cookie():
+    session_auth = SessionAuthentication()
+    request = type('Request', (object,), {'cookies': {}})()
+    assert session_auth.authenticate(request) == False
+
+def test_session_authentication_invalid_session():
+    session_auth = SessionAuthentication()
+    request = type('Request', (object,), {'cookies': {'session_id': 'invalid'}})()
+    assert session_auth.authenticate(request) == False
+```
+
+#### [`tests/test_jwt_authentication.py`](command:_github.copilot.openSymbolFromReferences?%5B%22tests%2Ftest_jwt_authentication.py%22%2C%5B%7B%22uri%22%3A%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22d%3A%5C%5CsomethingIdroppedin%5C%5CSQA%5C%5CCan-AI-Be-a-Software-engineer%5C%5CPython%5C%5CGitHub-Copilot%5C%5CStrategy%5C%5Cround-3%5C%5Cprompt%5C%5Ctest-promt-1.txt%22%2C%22_sep%22%3A1%2C%22external%22%3A%22file%3A%2F%2F%2Fd%253A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22path%22%3A%22%2FD%3A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22scheme%22%3A%22file%22%7D%2C%22pos%22%3A%7B%22line%22%3A0%2C%22character%22%3A12%7D%7D%5D%5D "Go to definition")
+
+```python
+import pytest
+import jwt
+import datetime
+from auth_strategies.jwt_authentication import JWTAuthentication
+
+def test_jwt_authentication_success():
+    jwt_auth = JWTAuthentication('secret')
+    token = jwt_auth.generate_token('user1')
+    request = type('Request', (object,), {'headers': {'Authorization': token}})()
+    assert jwt_auth.authenticate(request) == True
+
+def test_jwt_authentication_no_token():
+    jwt_auth = JWTAuthentication('secret')
+    request = type('Request', (object,), {'headers': {}})()
+    assert jwt_auth.authenticate(request) == False
+
+def test_jwt_authentication_expired_token():
+    jwt_auth = JWTAuthentication('secret')
+    payload = {
+        'username': 'user1',
+        'exp': datetime.datetime.utcnow() - datetime.timedelta(seconds=1)
+    }
+    token = jwt.encode(payload, 'secret', algorithm='HS256')
+    request = type('Request', (object,), {'headers': {'Authorization': token}})()
+    assert jwt_auth.authenticate(request) == False
+
+def test_jwt_authentication_invalid_token():
+    jwt_auth = JWTAuthentication('secret')
+    request = type('Request', (object,), {'headers': {'Authorization': 'invalid'}})()
+    assert jwt_auth.authenticate(request) == False
+```
+
+#### [`tests/test_api_key_authentication.py`](command:_github.copilot.openSymbolFromReferences?%5B%22tests%2Ftest_api_key_authentication.py%22%2C%5B%7B%22uri%22%3A%7B%22%24mid%22%3A1%2C%22fsPath%22%3A%22d%3A%5C%5CsomethingIdroppedin%5C%5CSQA%5C%5CCan-AI-Be-a-Software-engineer%5C%5CPython%5C%5CGitHub-Copilot%5C%5CStrategy%5C%5Cround-3%5C%5Cprompt%5C%5Ctest-promt-1.txt%22%2C%22_sep%22%3A1%2C%22external%22%3A%22file%3A%2F%2F%2Fd%253A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22path%22%3A%22%2FD%3A%2FsomethingIdroppedin%2FSQA%2FCan-AI-Be-a-Software-engineer%2FPython%2FGitHub-Copilot%2FStrategy%2Fround-3%2Fprompt%2Ftest-promt-1.txt%22%2C%22scheme%22%3A%22file%22%7D%2C%22pos%22%3A%7B%22line%22%3A0%2C%22character%22%3A12%7D%7D%5D%5D "Go to definition")
+
+```python
+import pytest
+from auth_strategies.api_key_authentication import APIKeyAuthentication
+
+def test_api_key_authentication_success():
+    api_keys = {'valid_api_key'}
+    api_key_auth = APIKeyAuthentication(api_keys)
+    request = type('Request', (object,), {'headers': {'Authorization': 'valid_api_key'}})()
+    assert api_key_auth.authenticate(request) == True
+
+def test_api_key_authentication_no_key():
+    api_keys = {'valid_api_key'}
+    api_key_auth = APIKeyAuthentication(api_keys)
+    request = type('Request', (object,), {'headers': {}})()
+    assert api_key_auth.authenticate(request) == False
+
+def test_api_key_authentication_invalid_key():
+    api_keys = {'valid_api_key'}
+    api_key_auth = APIKeyAuthentication(api_keys)
+    request = type('Request', (object,), {'headers': {'Authorization': 'invalid'}})()
+    assert api_key_auth.authenticate(request) == False
+
+def test_api_key_authentication_query_param():
+    api_keys = {'valid_api_key'}
+    api_key_auth = APIKeyAuthentication(api_keys)
+    request = type('Request', (object,), {'headers': {}, 'args': {'api_key': 'valid_api_key'}})()
+    assert api_key_auth.authenticate(request) == True
+```
+
+### Running the Tests
+
+To run the tests and ensure 100% statement coverage, use the following command:
+
+```sh
+pytest --cov=auth_strategies tests/
+```
+
+This will run all the tests and generate a coverage report.

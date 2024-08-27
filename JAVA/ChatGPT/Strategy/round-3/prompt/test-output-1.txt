@@ -1,0 +1,231 @@
+Here’s how you can write unit tests that provide 100% branch coverage for each of the authentication strategies using JUnit. This will cover both the happy paths (valid authentication) and the failure cases (invalid authentication or missing inputs).
+
+### Testing Basic Authentication
+
+This test will cover all branches of the `BasicAuthentication` class.
+
+```java
+package com.authsystem;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import javax.servlet.http.HttpServletRequest;
+import static org.mockito.Mockito.*;
+
+class BasicAuthenticationTest {
+
+    @Test
+    void testValidBasicAuthentication() throws AuthenticationException {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("Basic YWRtaW46cGFzc3dvcmQ="); // admin:password
+
+        Authenticator basicAuth = new BasicAuthentication();
+        assertTrue(basicAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testMissingAuthorizationHeader() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn(null);
+
+        Authenticator basicAuth = new BasicAuthentication();
+        assertThrows(AuthenticationException.class, () -> basicAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testInvalidBasicAuthenticationFormat() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("Bearer token");
+
+        Authenticator basicAuth = new BasicAuthentication();
+        assertThrows(AuthenticationException.class, () -> basicAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testInvalidCredentials() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("Basic YWRtaW46aW52YWxpZA=="); // admin:invalid
+
+        Authenticator basicAuth = new BasicAuthentication();
+        assertThrows(AuthenticationException.class, () -> basicAuth.authenticate(mockRequest));
+    }
+}
+```
+
+### Testing Session-Based Authentication
+
+This will ensure all branches are covered for the `SessionBasedAuthentication` class.
+
+```java
+package com.authsystem;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
+import static org.mockito.Mockito.*;
+
+class SessionBasedAuthenticationTest {
+
+    @Test
+    void testValidSessionAuthentication() throws AuthenticationException {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        HttpSession mockSession = mock(HttpSession.class);
+
+        when(mockRequest.getSession(false)).thenReturn(mockSession);
+        when(mockSession.getAttribute("user")).thenReturn("user");
+
+        Authenticator sessionAuth = new SessionBasedAuthentication();
+        assertTrue(sessionAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testInvalidSessionAuthentication() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getSession(false)).thenReturn(null);
+
+        Authenticator sessionAuth = new SessionBasedAuthentication();
+        assertThrows(AuthenticationException.class, () -> sessionAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testSessionWithoutUserAttribute() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        HttpSession mockSession = mock(HttpSession.class);
+
+        when(mockRequest.getSession(false)).thenReturn(mockSession);
+        when(mockSession.getAttribute("user")).thenReturn(null);
+
+        Authenticator sessionAuth = new SessionBasedAuthentication();
+        assertThrows(AuthenticationException.class, () -> sessionAuth.authenticate(mockRequest));
+    }
+}
+```
+
+### Testing JWT Authentication
+
+This test ensures complete branch coverage for `JwtAuthentication`.
+
+```java
+package com.authsystem;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import io.jsonwebtoken.*;
+import javax.servlet.http.HttpServletRequest;
+import static org.mockito.Mockito.*;
+
+class JwtAuthenticationTest {
+
+    private static final String SECRET_KEY = "secret";
+
+    @Test
+    void testValidJwtAuthentication() throws AuthenticationException {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+
+        JwtAuthentication jwtAuth = new JwtAuthentication();
+        String token = jwtAuth.generateToken("user");
+        when(mockRequest.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        assertTrue(jwtAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testMissingAuthorizationHeader() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn(null);
+
+        Authenticator jwtAuth = new JwtAuthentication();
+        assertThrows(AuthenticationException.class, () -> jwtAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testInvalidTokenFormat() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("Bearer invalid_token");
+
+        Authenticator jwtAuth = new JwtAuthentication();
+        assertThrows(AuthenticationException.class, () -> jwtAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testExpiredJwtToken() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+
+        // Generate an expired token
+        String expiredToken = Jwts.builder()
+                .setSubject("user")
+                .setExpiration(new Date(System.currentTimeMillis() - 1000)) // expired 1 second ago
+                .signWith(SignatureAlgorithm.HS256, SECRET_KEY)
+                .compact();
+
+        when(mockRequest.getHeader("Authorization")).thenReturn("Bearer " + expiredToken);
+
+        Authenticator jwtAuth = new JwtAuthentication();
+        assertThrows(AuthenticationException.class, () -> jwtAuth.authenticate(mockRequest));
+    }
+}
+```
+
+### Testing API Key Authentication
+
+This test ensures all branches are covered for `ApiKeyAuthentication`.
+
+```java
+package com.authsystem;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import javax.servlet.http.HttpServletRequest;
+import static org.mockito.Mockito.*;
+
+class ApiKeyAuthenticationTest {
+
+    @Test
+    void testValidApiKeyAuthentication() throws AuthenticationException {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("123456");
+
+        Authenticator apiKeyAuth = new ApiKeyAuthentication();
+        assertTrue(apiKeyAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testMissingApiKey() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn(null);
+        when(mockRequest.getParameter("api_key")).thenReturn(null);
+
+        Authenticator apiKeyAuth = new ApiKeyAuthentication();
+        assertThrows(AuthenticationException.class, () -> apiKeyAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testInvalidApiKey() {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn("invalid_key");
+
+        Authenticator apiKeyAuth = new ApiKeyAuthentication();
+        assertThrows(AuthenticationException.class, () -> apiKeyAuth.authenticate(mockRequest));
+    }
+
+    @Test
+    void testValidApiKeyFromQueryParam() throws AuthenticationException {
+        HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+        when(mockRequest.getHeader("Authorization")).thenReturn(null);
+        when(mockRequest.getParameter("api_key")).thenReturn("abcdef");
+
+        Authenticator apiKeyAuth = new ApiKeyAuthentication();
+        assertTrue(apiKeyAuth.authenticate(mockRequest));
+    }
+}
+```
+
+### Final Remarks on Coverage
+
+- **Basic Authentication:** Covers both valid and invalid cases, including missing headers, incorrect formats, and incorrect credentials.
+- **Session-Based Authentication:** Covers valid sessions, invalid sessions (e.g., null sessions), and sessions without the required user attribute.
+- **JWT Authentication:** Covers valid tokens, missing tokens, invalid formats, and expired tokens.
+- **API Key Authentication:** Covers valid keys, missing keys (from both headers and query parameters), and invalid keys.
+
+By running these tests, you will achieve 100% branch coverage for your authentication strategies, ensuring that all potential code paths are tested.

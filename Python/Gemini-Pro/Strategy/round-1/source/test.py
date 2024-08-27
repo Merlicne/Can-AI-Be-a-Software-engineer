@@ -1,0 +1,150 @@
+import base64
+import jwt
+from flask import Flask, request, jsonify, session
+from .strategies import (
+    BasicAuthStrategy,
+    SessionAuthStrategy,
+    JWTAuthStrategy,
+    APIKeyAuthStrategy,
+)
+from .authenticator import Authenticator
+from .exceptions import AuthenticationError
+import pytest
+
+# Mocking Flask request object for testing
+class MockRequest:
+    def __init__(self, headers=None, cookies=None, args=None):
+        self.headers = headers or {}
+        self.cookies = cookies or {}
+        self.args = args or {}
+
+# Test BasicAuthStrategy
+def test_basic_auth_valid_credentials():
+    users = {"user1": "password1"}
+    strategy = BasicAuthStrategy(users)
+    request = MockRequest(headers={'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQx'})
+    assert strategy.authenticate(request) is True
+
+def test_basic_auth_invalid_credentials():
+    users = {"user1": "password1"}
+    strategy = BasicAuthStrategy(users)
+    request = MockRequest(headers={'Authorization': 'Basic dXNlcjE6cGFzc3dvcmQy'})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_basic_auth_missing_header():
+    users = {"user1": "password1"}
+    strategy = BasicAuthStrategy(users)
+    request = MockRequest()
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_basic_auth_invalid_header_format():
+    users = {"user1": "password1"}
+    strategy = BasicAuthStrategy(users)
+    request = MockRequest(headers={'Authorization': 'Invalid header'})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_basic_auth_invalid_credentials_encoding():
+    users = {"user1": "password1"}
+    strategy = BasicAuthStrategy(users)
+    request = MockRequest(headers={'Authorization': 'Basic abcd'})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+
+# Test SessionAuthStrategy
+def test_session_auth_valid_session():
+    strategy = SessionAuthStrategy()
+    request = MockRequest(cookies={'session_id': 'test_session_id'})
+    with app.test_request_context():
+        session['test_session_id'] = {'user': 'user1'}
+        assert strategy.authenticate(request) is True
+
+def test_session_auth_invalid_session():
+    strategy = SessionAuthStrategy()
+    request = MockRequest(cookies={'session_id': 'invalid_session_id'})
+    with app.test_request_context():
+        with pytest.raises(AuthenticationError):
+            strategy.authenticate(request)
+
+def test_session_auth_missing_session():
+    strategy = SessionAuthStrategy()
+    request = MockRequest()
+    with app.test_request_context():
+        with pytest.raises(AuthenticationError):
+            strategy.authenticate(request)
+
+# Test JWTAuthStrategy
+def test_jwt_auth_valid_token():
+    secret_key = "test_secret"
+    strategy = JWTAuthStrategy(secret_key)
+    token = jwt.encode({'user': 'user1'}, secret_key, algorithm='HS256')
+    request = MockRequest(headers={'Authorization': token})
+    assert strategy.authenticate(request) is True
+
+def test_jwt_auth_invalid_token():
+    secret_key = "test_secret"
+    strategy = JWTAuthStrategy(secret_key)
+    token = jwt.encode({'user': 'user1'}, 'invalid_secret', algorithm='HS256')
+    request = MockRequest(headers={'Authorization': token})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_jwt_auth_expired_token():
+    secret_key = "test_secret"
+    strategy = JWTAuthStrategy(secret_key)
+    token = jwt.encode({'user': 'user1', 'exp': 0}, secret_key, algorithm='HS256')
+    request = MockRequest(headers={'Authorization': token})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_jwt_auth_missing_header():
+    secret_key = "test_secret"
+    strategy = JWTAuthStrategy(secret_key)
+    request = MockRequest()
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+# Test APIKeyAuthStrategy
+def test_api_key_auth_valid_key():
+    api_keys = ["key1", "key2"]
+    strategy = APIKeyAuthStrategy(api_keys)
+    request = MockRequest(headers={'Authorization': 'key1'})
+    assert strategy.authenticate(request) is True
+
+def test_api_key_auth_valid_key_as_param():
+    api_keys = ["key1", "key2"]
+    strategy = APIKeyAuthStrategy(api_keys)
+    request = MockRequest(args={'api_key': 'key1'})
+    assert strategy.authenticate(request) is True
+
+def test_api_key_auth_invalid_key():
+    api_keys = ["key1", "key2"]
+    strategy = APIKeyAuthStrategy(api_keys)
+    request = MockRequest(headers={'Authorization': 'invalid_key'})
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+def test_api_key_auth_missing_key():
+    api_keys = ["key1", "key2"]
+    strategy = APIKeyAuthStrategy(api_keys)
+    request = MockRequest()
+    with pytest.raises(AuthenticationError):
+        strategy.authenticate(request)
+
+# Test Authenticator
+def test_authenticator_set_strategy():
+    authenticator = Authenticator(BasicAuthStrategy({'user': 'pass'}))
+    new_strategy = SessionAuthStrategy()
+    authenticator.set_strategy(new_strategy)
+    assert authenticator.strategy == new_strategy
+
+def test_authenticator_authenticate():
+    mock_strategy = Mock()
+    mock_strategy.authenticate.return_value = True
+    authenticator = Authenticator(mock_strategy)
+    request = MockRequest()
+    assert authenticator.authenticate(request) is True
+    mock_strategy.authenticate.assert_called_once_with(request)

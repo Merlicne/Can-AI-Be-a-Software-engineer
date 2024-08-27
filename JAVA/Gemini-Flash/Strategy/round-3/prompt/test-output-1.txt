@@ -1,0 +1,271 @@
+package com.example.authentication;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class BasicAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " +  Base64.getEncoder().encodeToString("user1:password1".getBytes()));
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " +  Base64.getEncoder().encodeToString("user1:password2".getBytes()));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentials_WrongLength() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " +  Base64.getEncoder().encodeToString("user1:password1:extra".getBytes()));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingAuthorizationHeader() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_AuthorizationHeaderNotBasic() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " +  Base64.getEncoder().encodeToString("user1:password1".getBytes()));
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+
+class SessionAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(new Cookie[] {new Cookie("sessionId", "sessionId1")});
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(new Cookie[] {new Cookie("sessionId", "sessionId2")});
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingSessionCookie() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+
+class JWTAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidToken() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + JWT.create().withIssuer("your-issuer").sign(Algorithm.HMAC256("your-secret-key")));
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + JWT.create().withIssuer("your-issuer").sign(Algorithm.HMAC256("wrong-secret-key")));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken_Expired() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + JWT.create().withIssuer("your-issuer").withExpiresAt(new Date(System.currentTimeMillis() - (1000 * 60 * 60))).sign(Algorithm.HMAC256("your-secret-key")));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingAuthorizationHeader() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_AuthorizationHeaderNotBearer() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " + JWT.create().withIssuer("your-issuer").sign(Algorithm.HMAC256("your-secret-key")));
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+
+class APIKeyAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidApiKey_Header() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("apiKey1");
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_ValidApiKey_QueryParameter() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getParameter("apiKey")).thenReturn("apiKey1");
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidApiKey() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("apiKey2");
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingApiKey() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+        Mockito.when(request.getParameter("apiKey")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+
+class AuthenticationServiceTest {
+
+    @Test
+    void testIsAuthenticated_Success() {
+        Authenticator authenticator = Mockito.mock(Authenticator.class);
+        Mockito.when(authenticator.authenticate(Mockito.any(HttpServletRequest.class))).thenReturn(true);
+        AuthenticationService service = new AuthenticationService(authenticator);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+
+        assertTrue(service.isAuthenticated(request));
+    }
+
+    @Test
+    void testIsAuthenticated_Failure() {
+        Authenticator authenticator = Mockito.mock(Authenticator.class);
+        Mockito.when(authenticator.authenticate(Mockito.any(HttpServletRequest.class))).thenReturn(false);
+        AuthenticationService service = new AuthenticationService(authenticator);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+
+        assertFalse(service.isAuthenticated(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+Explanation of Added Test Cases for 100% Branch Coverage:
+
+BasicAuthenticationStrategy:
+
+testAuthenticate_InvalidCredentials_WrongLength: Added to cover the case when the decoded credentials don't have the expected length (two parts: username and password), leading to an invalid authentication attempt.
+
+testAuthenticate_AuthorizationHeaderNotBasic: Added to cover the case when the Authorization header doesn't start with "Basic", ensuring that the strategy correctly handles incorrect header formats.
+
+JWTAuthenticationStrategy:
+
+testAuthenticate_InvalidToken_Expired: Added to cover the case when the JWT token is expired, leading to an invalid authentication attempt.
+
+testAuthenticate_AuthorizationHeaderNotBearer: Added to cover the case when the Authorization header doesn't start with "Bearer", ensuring that the strategy correctly handles incorrect header formats.
+
+APIKeyAuthenticationStrategy:
+
+No additional test cases were needed for APIKeyAuthenticationStrategy as all branches were already covered by the existing tests.
+
+Code Coverage Report:
+
+By running these tests, you should achieve 100% branch coverage for the implemented authentication system. You can use a code coverage tool like JaCoCo to verify the coverage results.
+
+Remember: This test suite is based on the provided code snippets and assumptions about the implementation. It's important to adapt these tests to your specific implementation and add additional tests for any edge cases specific to your project.

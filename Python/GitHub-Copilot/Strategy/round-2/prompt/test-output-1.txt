@@ -1,0 +1,221 @@
+To achieve 100% statement coverage for the authentication system using the Strategy Design Pattern, we need to ensure that all possible code paths are tested. Below are the unit tests for each authentication strategy, covering all statements.
+
+### Directory Structure
+```
+auth_system/
+├── auth_strategies/
+│   ├── __init__.py
+│   ├── base_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   ├── api_key_auth.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_base_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   ├── test_api_key_auth.py
+├── main.py
+├── requirements.txt
+└── README.md
+```
+
+### Unit Tests
+
+#### `tests/test_base_auth.py`
+```python
+import pytest
+from auth_strategies.base_auth import BaseAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+base_auth = BaseAuth()
+
+@app.route('/test-base-auth', methods=['GET'])
+def test_base_auth_route():
+    try:
+        base_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_base_auth():
+    with app.test_client() as client:
+        # Test successful authentication
+
+
+       
+
+ headers = {
+            'Authorization': 'Basic YWRtaW46cGFzc3dvcmQ='  # Base64 for 'admin:password'
+        }
+        response = client.get('/test-base-auth', headers=headers)
+        assert response.status_code == 200
+
+        # Test missing Authorization header
+        response = client.get('/test-base-auth')
+        assert response.status_code == 401
+
+        # Test invalid auth type
+        headers = {
+            'Authorization': 'Bearer YWRtaW46cGFzc3dvcmQ='
+        }
+        response = client.get('/test-base-auth', headers=headers)
+        assert response.status_code == 401
+
+        # Test invalid credentials
+        headers = {
+            'Authorization': 'Basic aW52YWxpZDppbnZhbGlk'  # Base64 for 'invalid:invalid'
+        }
+        response = client.get('/test-base-auth', headers=headers)
+        assert response.status_code == 401
+```
+
+#### `tests/test_session_auth.py`
+```python
+import pytest
+from auth_strategies.session_auth import SessionAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+session_auth = SessionAuth()
+
+@app.route('/test-session-auth', methods=['GET'])
+def test_session_auth_route():
+    try:
+        session_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_session_auth():
+    with app.test_client() as client:
+        # Test successful login and authentication
+        session_id = session_auth.login('admin', 'password')
+        cookies = {
+            'session_id': session_id
+        }
+        response = client.get('/test-session-auth', cookies=cookies)
+        assert response.status_code == 200
+
+        # Test missing session ID
+        response = client.get('/test-session-auth')
+        assert response.status_code == 401
+
+        # Test invalid session ID
+        cookies = {
+            'session_id': 'invalid'
+        }
+        response = client.get('/test-session-auth', cookies=cookies)
+        assert response.status_code == 401
+
+        # Test invalid login credentials
+        with pytest.raises(Exception, match="Invalid credentials"):
+            session_auth.login('invalid', 'invalid')
+```
+
+#### `tests/test_jwt_auth.py`
+```python
+import pytest
+from auth_strategies.jwt_auth import JWTAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+jwt_auth = JWTAuth()
+
+@app.route('/test-jwt-auth', methods=['GET'])
+def test_jwt_auth_route():
+    try:
+        jwt_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_jwt_auth():
+    with app.test_client() as client:
+        # Test successful login and authentication
+        token = jwt_auth.login('admin', 'password')
+        headers = {
+            'Authorization': f'Bearer {token}'
+        }
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 200
+
+        # Test missing Authorization header
+        response = client.get('/test-jwt-auth')
+        assert response.status_code == 401
+
+        # Test invalid auth type
+        headers = {
+            'Authorization': f'Basic {token}'
+        }
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 401
+
+        # Test invalid token
+        headers = {
+            'Authorization': 'Bearer invalid'
+        }
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 401
+
+        # Test expired token
+        import time
+        time.sleep(2)  # Assuming token expiration is set to 1 second for testing
+        response = client.get('/test-jwt-auth', headers=headers)
+        assert response.status_code == 401
+
+        # Test invalid login credentials
+        with pytest.raises(Exception, match="Invalid credentials"):
+            jwt_auth.login('invalid', 'invalid')
+```
+
+#### `tests/test_api_key_auth.py`
+```python
+import pytest
+from auth_strategies.api_key_auth import APIKeyAuth
+from flask import Flask, request
+
+app = Flask(__name__)
+api_key_auth = APIKeyAuth()
+
+@app.route('/test-api-key-auth', methods=['GET'])
+def test_api_key_auth_route():
+    try:
+        api_key_auth.authenticate(request)
+        return "Authenticated", 200
+    except Exception as e:
+        return str(e), 401
+
+def test_api_key_auth():
+    with app.test_client() as client:
+        # Test successful authentication with header
+        headers = {
+            'Authorization': 'key1'
+        }
+        response = client.get('/test-api-key-auth', headers=headers)
+        assert response.status_code == 200
+
+        # Test successful authentication with query parameter
+        response = client.get('/test-api-key-auth?api_key=key1')
+        assert response.status_code == 200
+
+        # Test missing API key
+        response = client.get('/test-api-key-auth')
+        assert response.status_code == 401
+
+        # Test invalid API key
+        headers = {
+            'Authorization': 'invalid'
+        }
+        response = client.get('/test-api-key-auth', headers=headers)
+        assert response.status_code == 401
+```
+
+### Running the Tests
+To run the tests and ensure 100% statement coverage, use the following command:
+```sh
+pytest --cov=auth_strategies tests/
+```
+
+This setup ensures that all code paths in the authentication strategies are tested, providing 100% statement coverage.

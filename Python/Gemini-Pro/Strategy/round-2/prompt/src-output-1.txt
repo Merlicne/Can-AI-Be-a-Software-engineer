@@ -1,0 +1,186 @@
+Pluggable Authentication System in Python using Strategy Pattern
+
+This project implements a pluggable authentication system using the Strategy Design Pattern in Python. It allows for easy switching between different authentication mechanisms:
+
+Basic Authentication: Username and password authentication.
+
+Session-Based Authentication: Authentication using server-side sessions.
+
+JWT (JSON Web Token) Authentication: Stateless authentication using JWTs.
+
+API Key Authentication: Authentication using unique API keys.
+
+Directory Structure:
+├── auth
+│   ├── __init__.py
+│   ├── authenticator.py 
+│   ├── strategies
+│   │   ├── __init__.py
+│   │   ├── basic_auth.py
+│   │   ├── session_auth.py
+│   │   ├── jwt_auth.py
+│   │   ├── api_key_auth.py
+│   └── exceptions.py
+├── app.py
+├── requirements.txt
+├── tests
+│   ├── __init__.py
+│   ├── test_basic_auth.py
+│   ├── test_session_auth.py
+│   ├── test_jwt_auth.py
+│   └── test_api_key_auth.py
+content_copy
+Use code with caution.
+Dependencies:
+
+PyJWT for JWT handling
+
+Flask (or similar framework) for web application and session handling (Optional for demonstration)
+
+You can install the dependencies using:
+
+pip install -r requirements.txt
+content_copy
+Use code with caution.
+Bash
+Code Implementation:
+
+auth/authenticator.py:
+
+from abc import ABC, abstractmethod
+
+class Authenticator(ABC):
+    """
+    Abstract base class for authentication strategies.
+    """
+
+    @abstractmethod
+    def authenticate(self, request):
+        """
+        Authenticates the given request.
+
+        Args:
+            request: The incoming request object.
+
+        Returns:
+            The authenticated user object if successful, otherwise None.
+        Raises:
+            AuthenticationError: If authentication fails.
+        """
+        pass
+content_copy
+Use code with caution.
+Python
+
+auth/strategies/basic_auth.py:
+
+import base64
+from auth.authenticator import Authenticator
+from auth.exceptions import AuthenticationError
+
+class BasicAuthenticator(Authenticator):
+    """
+    Basic authentication strategy.
+    """
+
+    def authenticate(self, request):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Basic '):
+            raise AuthenticationError('Missing or invalid Authorization header.')
+
+        auth_data = base64.b64decode(auth_header[6:]).decode('utf-8')
+        username, password = auth_data.split(':', 1)
+
+        # Authenticate user against predefined set (replace with your logic)
+        if username == 'user' and password == 'password':
+            return {'username': username}
+
+        raise AuthenticationError('Invalid username or password.')
+content_copy
+Use code with caution.
+Python
+
+auth/strategies/session_auth.py:
+
+from flask import session
+from auth.authenticator import Authenticator
+from auth.exceptions import AuthenticationError
+
+class SessionAuthenticator(Authenticator):
+    """
+    Session-based authentication strategy.
+    """
+
+    def authenticate(self, request):
+        user_id = session.get('user_id')
+        if not user_id:
+            raise AuthenticationError('Not logged in.')
+
+        # Retrieve user from database based on session (replace with your logic)
+        user = {'user_id': user_id}
+        return user
+content_copy
+Use code with caution.
+Python
+
+(Similar implementations for JWTAuthenticator and APIKeyAuthenticator in respective files)
+
+app.py (Example Usage with Flask):
+
+from flask import Flask
+from auth.strategies.basic_auth import BasicAuthenticator
+# ... other imports
+
+app = Flask(__name__)
+app.secret_key = 'your_secret_key' # Required for sessions
+
+# Set the desired authentication strategy
+auth_strategy = BasicAuthenticator() 
+
+@app.route('/protected')
+def protected_route():
+    try:
+        user = auth_strategy.authenticate(request)
+        return f"Welcome, {user['username']}!"
+    except AuthenticationError as e:
+        return f"Authentication Error: {e}", 401
+
+if __name__ == "__main__":
+    app.run(debug=True)
+content_copy
+Use code with caution.
+Python
+
+Testing (example for basic_auth):
+
+import unittest
+from unittest.mock import Mock
+from auth.strategies.basic_auth import BasicAuthenticator
+from auth.exceptions import AuthenticationError
+
+class TestBasicAuthenticator(unittest.TestCase):
+    def test_valid_credentials(self):
+        request = Mock(headers={'Authorization': 'Basic dXNlcjpwYXNzd29yZA=='})
+        authenticator = BasicAuthenticator()
+        user = authenticator.authenticate(request)
+        self.assertEqual(user['username'], 'user')
+
+    def test_invalid_credentials(self):
+        request = Mock(headers={'Authorization': 'Basic invalid'})
+        authenticator = BasicAuthenticator()
+        with self.assertRaises(AuthenticationError):
+            authenticator.authenticate(request)
+content_copy
+Use code with caution.
+Python
+Notes:
+
+Replace placeholder comments with your actual database/storage logic.
+
+Implement other authentication strategies (JWT, API Key) similarly.
+
+Write comprehensive unit tests for all strategies and error handling.
+
+This is a basic implementation. Consider using libraries like Flask-Login for more robust session management in production environments.
+
+You can easily switch between authentication strategies by changing the auth_strategy variable in app.py.

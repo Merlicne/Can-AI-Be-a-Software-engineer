@@ -1,0 +1,384 @@
+// BasicAuthenticatorTest.java
+package com.authsystem.auth;
+
+import com.authsystem.user.User;
+import com.authsystem.user.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+public class BasicAuthenticatorTest {
+
+    private BasicAuthenticator authenticator;
+    private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        userService = Mockito.mock(UserService.class);
+        authenticator = new BasicAuthenticator(userService);
+    }
+
+    @Test
+    void testAuthenticate_Success() throws AuthenticationException {
+        String username = "testuser";
+        String password = "testpassword";
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+
+        User user = new User(username, password);
+        when(userService.findByUsername(username)).thenReturn(user);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+
+        User authenticatedUser = authenticator.authenticate(request);
+        assertEquals(user, authenticatedUser);
+        verify(userService, times(1)).findByUsername(username);
+    }
+
+    @Test
+    void testAuthenticate_MissingHeader() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(0)).findByUsername(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidHeaderPrefix() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("InvalidPrefix");
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(0)).findByUsername(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentialsFormat() {
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString("invalidformat".getBytes());
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(0)).findByUsername(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidUsername() {
+        String username = "invaliduser";
+        String password = "testpassword";
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+        when(userService.findByUsername(username)).thenReturn(null);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(1)).findByUsername(username);
+    }
+
+    @Test
+    void testAuthenticate_InvalidPassword() {
+        String username = "testuser";
+        String password = "invalidpassword";
+        String encodedCredentials = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes());
+
+        User user = new User(username, "testpassword"); // Different password
+        when(userService.findByUsername(username)).thenReturn(user);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(encodedCredentials);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(1)).findByUsername(username);
+    }
+}
+content_copy
+Use code with caution.
+Java
+// SessionAuthenticatorTest.java
+package com.authsystem.auth;
+
+import com.authsystem.session.SessionManager;
+import com.authsystem.user.User;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+public class SessionAuthenticatorTest {
+
+    private SessionAuthenticator authenticator;
+    private SessionManager sessionManager;
+
+    @BeforeEach
+    void setUp() {
+        sessionManager = Mockito.mock(SessionManager.class);
+        authenticator = new SessionAuthenticator(sessionManager);
+    }
+
+    @Test
+    void testAuthenticate_Success() throws AuthenticationException {
+        String sessionId = "testSessionId";
+        User user = new User("testuser", "testpassword");
+
+        when(sessionManager.getUserBySessionId(sessionId)).thenReturn(user);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("sessionId")).thenReturn(sessionId);
+
+        User authenticatedUser = authenticator.authenticate(request);
+
+        assertEquals(user, authenticatedUser);
+        verify(sessionManager, times(1)).getUserBySessionId(sessionId);
+    }
+
+    @Test
+    void testAuthenticate_MissingCookie() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("sessionId")).thenReturn(null);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(sessionManager, times(0)).getUserBySessionId(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidSessionId() {
+        String sessionId = "invalidSessionId";
+
+        when(sessionManager.getUserBySessionId(sessionId)).thenReturn(null);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getCookie("sessionId")).thenReturn(sessionId);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(sessionManager, times(1)).getUserBySessionId(sessionId);
+    }
+}
+content_copy
+Use code with caution.
+Java
+// JWTAuthenticatorTest.java
+package com.authsystem.auth;
+
+import com.authsystem.token.JWTUtil;
+import com.authsystem.user.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import java.util.Date;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+public class JWTAuthenticatorTest {
+
+    private JWTAuthenticator authenticator;
+    private JWTUtil jwtUtil;
+    private String secretKey = "testsecret";
+
+    @BeforeEach
+    void setUp() {
+        jwtUtil = Mockito.mock(JWTUtil.class);
+        authenticator = new JWTAuthenticator(jwtUtil);
+    }
+
+    @Test
+    void testAuthenticate_Success() throws AuthenticationException {
+        String username = "testuser";
+        String token = generateTestToken(username, secretKey);
+
+        Claims claims = Jwts.parser()
+                .setSigningKey(secretKey)
+                .parseClaimsJws(token)
+                .getBody();
+        when(jwtUtil.parseToken(token)).thenReturn(claims);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+
+        User user = new User(username, "testpassword");
+        // Assuming you retrieve user details from database based on username in actual implementation
+        // ... Mock that retrieval here
+
+        User authenticatedUser = authenticator.authenticate(request);
+        assertEquals(user, authenticatedUser); 
+        verify(jwtUtil, times(1)).parseToken(token);
+    }
+
+    @Test
+    void testAuthenticate_MissingHeader() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(jwtUtil, times(0)).parseToken(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidHeaderPrefix() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("InvalidPrefix");
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(jwtUtil, times(0)).parseToken(anyString());
+    }
+
+    @Test
+    void testAuthenticate_ExpiredToken() {
+        String username = "testuser";
+        String expiredToken = generateExpiredTestToken(username, secretKey);
+
+        when(jwtUtil.parseToken(expiredToken)).thenThrow(new ExpiredJwtException(null, null, "Expired"));
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + expiredToken);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(jwtUtil, times(1)).parseToken(expiredToken);
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken() {
+        String invalidToken = "invalidtoken";
+
+        when(jwtUtil.parseToken(invalidToken)).thenThrow(new JwtException("Invalid token"));
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + invalidToken);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(jwtUtil, times(1)).parseToken(invalidToken);
+    }
+
+    // Helper methods to generate test tokens
+    private String generateTestToken(String username, String secretKey) {
+        return Jwts.builder()
+                .setSubject(username)
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60)) // Expires in 1 hour
+                .signWith(SignatureAlgorithm.HS512, secretKey)
+                .compact();
+    }
+
+    private String generateExpiredTestToken(String username, String secretKey) {
+        return Jwts.builder()
+                .setSubject(username)
+                .setExpiration(new Date(System.currentTimeMillis() - 1000)) // Already expired
+                .signWith(SignatureAlgorithm.HS512, secretKey)
+                .compact();
+    }
+}
+content_copy
+Use code with caution.
+Java
+// APIKeyAuthenticatorTest.java
+package com.authsystem.auth;
+
+import com.authsystem.user.User;
+import com.authsystem.user.UserService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+public class APIKeyAuthenticatorTest {
+
+    private APIKeyAuthenticator authenticator;
+    private UserService userService;
+
+    @BeforeEach
+    void setUp() {
+        userService = Mockito.mock(UserService.class);
+        authenticator = new APIKeyAuthenticator(userService);
+    }
+
+    @Test
+    void testAuthenticate_SuccessWithHeader() throws AuthenticationException {
+        String apiKey = "testApiKey";
+        User user = new User("testuser", "testpassword");
+        user.setApiKey(apiKey);
+
+        when(userService.findByApiKey(apiKey)).thenReturn(user);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("X-API-Key")).thenReturn(apiKey);
+
+        User authenticatedUser = authenticator.authenticate(request);
+
+        assertEquals(user, authenticatedUser);
+        verify(userService, times(1)).findByApiKey(apiKey);
+        verify(request, times(1)).getHeader("X-API-Key");
+        verify(request, times(0)).getParameter("apiKey");
+    }
+
+    @Test
+    void testAuthenticate_SuccessWithParameter() throws AuthenticationException {
+        String apiKey = "testApiKey";
+        User user = new User("testuser", "testpassword");
+        user.setApiKey(apiKey);
+
+        when(userService.findByApiKey(apiKey)).thenReturn(user);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("X-API-Key")).thenReturn(null); // Header not present
+        when(request.getParameter("apiKey")).thenReturn(apiKey);
+
+        User authenticatedUser = authenticator.authenticate(request);
+
+        assertEquals(user, authenticatedUser);
+        verify(userService, times(1)).findByApiKey(apiKey);
+        verify(request, times(1)).getHeader("X-API-Key");
+        verify(request, times(1)).getParameter("apiKey"); 
+    }
+
+    @Test
+    void testAuthenticate_MissingApiKey() {
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("X-API-Key")).thenReturn(null);
+        when(request.getParameter("apiKey")).thenReturn(null);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(0)).findByApiKey(anyString());
+    }
+
+    @Test
+    void testAuthenticate_InvalidApiKey() {
+        String apiKey = "invalidApiKey";
+
+        when(userService.findByApiKey(apiKey)).thenReturn(null);
+
+        Request request = Mockito.mock(Request.class);
+        when(request.getHeader("X-API-Key")).thenReturn(apiKey);
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+        verify(userService, times(1)).findByApiKey(apiKey);
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+These test cases cover all branches and edge cases for each authentication strategy:
+
+Successful authentication: Verifies correct user retrieval and authentication.
+
+Missing or invalid headers/parameters: Tests scenarios where required authentication data is missing or malformed.
+
+Invalid credentials: Checks behavior when provided credentials are incorrect.
+
+Expired or invalid tokens: (For JWT) Verifies handling of expired and malformed JWTs.
+
+Remember to adapt the tests according to your specific implementation details and edge cases.

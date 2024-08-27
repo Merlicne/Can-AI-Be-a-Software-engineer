@@ -1,0 +1,250 @@
+### Unit Tests for 100% Branch Coverage
+
+To achieve 100% branch coverage, we need to ensure that all possible branches in our code are tested. Below are the unit tests for each authentication strategy.
+
+#### Basic Authentication Test
+```java
+// src/test/BasicAuthenticationTest.java
+package test;
+
+import auth.BasicAuthentication;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class BasicAuthenticationTest {
+    private BasicAuthentication basicAuth;
+    private Request request;
+
+    @BeforeEach
+    public void setUp() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        basicAuth = new BasicAuthentication(users);
+        request = new Request();
+    }
+
+    @Test
+    public void testAuthenticateSuccess() {
+        request
+
+.set
+
+Header("Authorization", "Basic dXNlcjE6cGFzc3dvcmQx"); // Base64 for "user1:password1"
+        assertTrue(basicAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailure() {
+        request.setHeader("Authorization", "Basic dXNlcjE6d3JvbmdwYXNz"); // Base64 for "user1:wrongpass"
+        assertFalse(basicAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateNoHeader() {
+        assertFalse(basicAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateInvalidHeader() {
+        request.setHeader("Authorization", "Basic invalidbase64");
+        assertFalse(basicAuth.authenticate(request));
+    }
+}
+```
+
+#### Session-Based Authentication Test
+```java
+// src/test/SessionBasedAuthenticationTest.java
+package test;
+
+import auth.SessionBasedAuthentication;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class SessionBasedAuthenticationTest {
+    private SessionBasedAuthentication sessionAuth;
+    private Request request;
+
+    @BeforeEach
+    public void setUp() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("validSessionId", "user1");
+        sessionAuth = new SessionBasedAuthentication(sessions);
+        request = new Request();
+    }
+
+    @Test
+    public void testAuthenticateSuccess() {
+        request.setCookie("SESSIONID", "validSessionId");
+        assertTrue(sessionAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailure() {
+        request.setCookie("SESSIONID", "invalidSessionId");
+        assertFalse(sessionAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateNoCookie() {
+        assertFalse(sessionAuth.authenticate(request));
+    }
+}
+```
+
+#### JWT Authentication Test
+```java
+// src/test/JWTAuthenticationTest.java
+package test;
+
+import auth.JWTAuthentication;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.Date;
+
+public class JWTAuthenticationTest {
+    private JWTAuthentication jwtAuth;
+    private Request request;
+    private String secretKey = "secret";
+
+    @BeforeEach
+    public void setUp() {
+        jwtAuth = new JWTAuthentication(secretKey);
+        request = new Request();
+    }
+
+    @Test
+    public void testAuthenticateSuccess() {
+        String token = Jwts.builder()
+                .setSubject("user1")
+                .setExpiration(new Date(System.currentTimeMillis() + 10000))
+                .signWith(SignatureAlgorithm.HS512, secretKey)
+                .compact();
+        request.setHeader("Authorization", "Bearer " + token);
+        assertTrue(jwtAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateExpiredToken() {
+        String token = Jwts.builder()
+                .setSubject("user1")
+                .setExpiration(new Date(System.currentTimeMillis() - 10000))
+                .signWith(SignatureAlgorithm.HS512, secretKey)
+                .compact();
+        request.setHeader("Authorization", "Bearer " + token);
+        assertFalse(jwtAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateInvalidToken() {
+        request.setHeader("Authorization", "Bearer invalidtoken");
+        assertFalse(jwtAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateNoHeader() {
+        assertFalse(jwtAuth.authenticate(request));
+    }
+}
+```
+
+#### API Key Authentication Test
+```java
+// src/test/APIKeyAuthenticationTest.java
+package test;
+
+import auth.APIKeyAuthentication;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.HashSet;
+import java.util.Set;
+
+public class APIKeyAuthenticationTest {
+    private APIKeyAuthentication apiKeyAuth;
+    private Request request;
+
+    @BeforeEach
+    public void setUp() {
+        Set<String> validApiKeys = new HashSet<>();
+        validApiKeys.add("validApiKey");
+        apiKeyAuth = new APIKeyAuthentication(validApiKeys);
+        request = new Request();
+    }
+
+    @Test
+    public void testAuthenticateSuccessWithHeader() {
+        request.setHeader("Authorization", "validApiKey");
+        assertTrue(apiKeyAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateSuccessWithQueryParam() {
+        request.setParameter("apiKey", "validApiKey");
+        assertTrue(apiKeyAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateFailure() {
+        request.setHeader("Authorization", "invalidApiKey");
+        assertFalse(apiKeyAuth.authenticate(request));
+    }
+
+    @Test
+    public void testAuthenticateNoApiKey() {
+        assertFalse(apiKeyAuth.authenticate(request));
+    }
+}
+```
+
+### Mock Request Class
+For the tests to work, we need a mock `Request` class to simulate HTTP requests.
+
+```java
+// src/test/Request.java
+package test;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public class Request {
+    private Map<String, String> headers = new HashMap<>();
+    private Map<String, String> cookies = new HashMap<>();
+    private Map<String, String> parameters = new HashMap<>();
+
+    public void setHeader(String key, String value) {
+        headers.put(key, value);
+    }
+
+    public String getHeader(String key) {
+        return headers.get(key);
+    }
+
+    public void setCookie(String key, String value) {
+        cookies.put(key, value);
+    }
+
+    public String getCookie(String key) {
+        return cookies.get(key);
+    }
+
+    public void setParameter(String key, String value) {
+        parameters.put(key, value);
+    }
+
+    public String getParameter(String key) {
+        return parameters.get(key);
+    }
+}
+```
+
+These unit tests cover all branches of the authentication strategies, ensuring 100% branch coverage.

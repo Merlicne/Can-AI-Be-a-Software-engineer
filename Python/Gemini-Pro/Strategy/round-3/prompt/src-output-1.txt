@@ -1,0 +1,186 @@
+Pluggable Authentication System in Python using Strategy Pattern
+
+This project demonstrates a pluggable authentication system using the Strategy design pattern in Python. This allows for easy switching between different authentication mechanisms like Basic, Session-based, JWT, and API Key authentication.
+
+Directory Structure
+├── auth
+│   ├── strategies.py          # Authentication strategies (classes)
+│   ├── __init__.py
+├── app.py                     # Main application
+├── tests
+│   ├── test_strategies.py     # Unit tests
+│   └── __init__.py
+├── requirements.txt           # Project dependencies
+└── README.md
+content_copy
+Use code with caution.
+Dependencies
+
+Flask
+
+PyJWT
+
+Install dependencies using: pip install -r requirements.txt
+
+Implementation Details
+
+1. auth/strategies.py:
+This module defines the AuthenticationStrategy abstract base class and concrete strategy classes for each authentication type.
+
+from abc import ABC, abstractmethod
+import base64
+import jwt
+from datetime import datetime, timedelta
+from flask import request, jsonify
+
+# ... (Import necessary modules for JWT, sessions, etc.)
+
+class AuthenticationStrategy(ABC):
+    """Abstract base class for authentication strategies."""
+    
+    @abstractmethod
+    def authenticate(self, request):
+        """Authenticates the request and returns the authenticated user or None."""
+        pass
+
+
+class BasicAuthenticationStrategy(AuthenticationStrategy):
+    """Basic authentication strategy using username and password."""
+    def __init__(self, users):
+        self.users = users
+
+    def authenticate(self, request):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Basic "):
+            return None
+
+        auth_parts = base64.b64decode(auth_header[6:]).decode("utf-8").split(":")
+        if len(auth_parts) != 2:
+            return None
+
+        username, password = auth_parts
+        if username in self.users and self.users[username] == password:
+            return username
+        return None
+
+
+class SessionAuthenticationStrategy(AuthenticationStrategy):
+    """Session-based authentication strategy."""
+    def __init__(self, session_manager):
+        self.session_manager = session_manager
+
+    def authenticate(self, request):
+        session_id = request.cookies.get("session_id")
+        if not session_id:
+            return None
+
+        user = self.session_manager.get_session(session_id)
+        return user
+
+
+class JWTAuthenticationStrategy(AuthenticationStrategy):
+    """JWT authentication strategy."""
+    def __init__(self, secret_key, algorithm="HS256"):
+        self.secret_key = secret_key
+        self.algorithm = algorithm
+
+    def authenticate(self, request):
+        token = request.headers.get("Authorization")
+        if not token or not token.startswith("Bearer "):
+            return None
+        
+        token = token.split(" ")[1]
+
+        try:
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            return payload.get("user")
+        except jwt.ExpiredSignatureError:
+            return None
+        except jwt.InvalidTokenError:
+            return None
+
+
+class APIKeyAuthenticationStrategy(AuthenticationStrategy):
+    """API key authentication strategy."""
+    def __init__(self, api_keys):
+        self.api_keys = api_keys
+
+    def authenticate(self, request):
+        api_key = request.headers.get("X-API-Key") or request.args.get("api_key")
+        if not api_key:
+            return None
+
+        if api_key in self.api_keys:
+            return self.api_keys[api_key]  # Return user associated with the API key
+        return None
+content_copy
+Use code with caution.
+Python
+
+2. app.py:
+This module defines the Flask application and uses the chosen authentication strategy.
+
+from flask import Flask, request, jsonify
+from auth.strategies import (
+    BasicAuthenticationStrategy,
+    SessionAuthenticationStrategy,
+    JWTAuthenticationStrategy,
+    APIKeyAuthenticationStrategy,
+)
+
+app = Flask(__name__)
+
+# --- Configure your authentication strategy here ---
+# Example:
+auth_strategy = BasicAuthenticationStrategy(
+    users={"admin": "password"}
+)
+# ------------------------------------------------
+
+@app.route("/api/resource", methods=["GET"])
+def protected_resource():
+    user = auth_strategy.authenticate(request)
+    if user:
+        return jsonify({"message": f"Welcome, {user}!"}), 200
+    else:
+        return jsonify({"message": "Authentication required"}), 401
+
+if __name__ == "__main__":
+    app.run(debug=True)
+content_copy
+Use code with caution.
+Python
+Explanation
+
+We define an abstract base class AuthenticationStrategy with an authenticate method.
+
+Each concrete authentication strategy (Basic, Session, JWT, API Key) inherits from AuthenticationStrategy and implements the authenticate method based on its logic.
+
+The app.py module sets the desired auth_strategy object to an instance of any concrete strategy.
+
+The protected_resource endpoint demonstrates how to authenticate a request using the chosen strategy.
+
+Switching Authentication Strategies
+
+To switch between authentication mechanisms, simply change the auth_strategy object in app.py to the desired strategy class. For example:
+
+# Use JWT authentication:
+auth_strategy = JWTAuthenticationStrategy(secret_key="your_secret_key")
+content_copy
+Use code with caution.
+Python
+Testing
+
+The tests/test_strategies.py file contains unit tests for each authentication strategy. You can run the tests using your preferred testing framework (e.g., pytest).
+
+Further Improvements
+
+Implement a persistent storage mechanism for sessions (database, Redis).
+
+Implement token refresh functionality for JWT authentication.
+
+Add error handling and logging.
+
+Implement user registration and login routes for each strategy.
+
+This implementation demonstrates a flexible and maintainable approach to authentication in Python using the Strategy design pattern. This allows you to easily add or modify authentication mechanisms without impacting the core application logic.

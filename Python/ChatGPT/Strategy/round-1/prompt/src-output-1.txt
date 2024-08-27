@@ -1,0 +1,229 @@
+To implement a pluggable authentication system in Python using the Strategy Design Pattern, we’ll design the system so that different authentication strategies can be easily switched without modifying the core application logic. Here's a step-by-step guide to achieving this, including a directory structure, dependencies, and detailed implementation.
+
+### Directory Structure
+
+```plaintext
+authentication_system/
+│
+├── auth_strategies/
+│   ├── __init__.py
+│   ├── basic_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   └── api_key_auth.py
+│
+├── main.py
+├── requirements.txt
+└── tests/
+    ├── __init__.py
+    ├── test_basic_auth.py
+    ├── test_session_auth.py
+    ├── test_jwt_auth.py
+    └── test_api_key_auth.py
+```
+
+### Dependencies
+
+Create a `requirements.txt` file to list the required libraries:
+
+```plaintext
+Flask==2.3.2
+PyJWT==2.7.0
+requests==2.28.2
+```
+
+Install the dependencies using pip:
+
+```sh
+pip install -r requirements.txt
+```
+
+### Implementation
+
+#### 1. Authenticator Interface
+
+Define the common interface for authentication strategies. Each strategy will implement this interface.
+
+```python
+# auth_strategies/authenticator.py
+from abc import ABC, abstractmethod
+from flask import Request
+
+class Authenticator(ABC):
+    @abstractmethod
+    def authenticate(self, request: Request) -> bool:
+        pass
+```
+
+#### 2. Basic Authentication Strategy
+
+```python
+# auth_strategies/basic_auth.py
+import base64
+from flask import Request
+from .authenticator import Authenticator
+
+class BasicAuth(Authenticator):
+    def __init__(self):
+        # Predefined credentials (for simplicity)
+        self.users = {
+            'user1': 'password1',
+            'user2': 'password2',
+        }
+
+    def authenticate(self, request: Request) -> bool:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Basic '):
+            return False
+
+        encoded_credentials = auth_header.split(' ')[1]
+        decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+
+        return self.users.get(username) == password
+```
+
+#### 3. Session-Based Authentication Strategy
+
+```python
+# auth_strategies/session_auth.py
+from flask import Request, session
+from .authenticator import Authenticator
+
+class SessionAuth(Authenticator):
+    def __init__(self):
+        self.sessions = {}
+
+    def authenticate(self, request: Request) -> bool:
+        session_id = request.cookies.get('session_id')
+        return session_id in self.sessions
+
+    def create_session(self, user_id: str) -> str:
+        import uuid
+        session_id = str(uuid.uuid4())
+        self.sessions[session_id] = user_id
+        return session_id
+```
+
+#### 4. JWT Authentication Strategy
+
+```python
+# auth_strategies/jwt_auth.py
+import jwt
+from flask import Request
+from datetime import datetime, timedelta
+from .authenticator import Authenticator
+
+SECRET_KEY = 'your_secret_key'
+
+class JWTAuth(Authenticator):
+    def authenticate(self, request: Request) -> bool:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return False
+
+        token = auth_header.split(' ')[1]
+        try:
+            decoded_token = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            return decoded_token['exp'] > datetime.utcnow().timestamp()
+        except jwt.ExpiredSignatureError:
+            return False
+        except jwt.InvalidTokenError:
+            return False
+
+    def create_token(self, user_id: str) -> str:
+        expiration = datetime.utcnow() + timedelta(hours=1)
+        payload = {
+            'user_id': user_id,
+            'exp': expiration.timestamp()
+        }
+        return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+```
+
+#### 5. API Key Authentication Strategy
+
+```python
+# auth_strategies/api_key_auth.py
+from flask import Request
+from .authenticator import Authenticator
+
+class APIKeyAuth(Authenticator):
+    def __init__(self):
+        self.api_keys = {
+            'key1': 'user1',
+            'key2': 'user2',
+        }
+
+    def authenticate(self, request: Request) -> bool:
+        api_key = request.headers.get('Authorization') or request.args.get('api_key')
+        return api_key in self.api_keys
+```
+
+#### 6. Main Application
+
+```python
+# main.py
+from flask import Flask, request, jsonify
+from auth_strategies.basic_auth import BasicAuth
+from auth_strategies.session_auth import SessionAuth
+from auth_strategies.jwt_auth import JWTAuth
+from auth_strategies.api_key_auth import APIKeyAuth
+
+app = Flask(__name__)
+app.secret_key = 'super_secret_key'
+
+# Choose your authentication strategy
+authenticator = BasicAuth()  # Replace with SessionAuth(), JWTAuth(), or APIKeyAuth()
+
+@app.route('/login', methods=['POST'])
+def login():
+    if authenticator.authenticate(request):
+        # Handle login success (e.g., create session or generate JWT token)
+        return jsonify({'message': 'Authenticated'}), 200
+    return jsonify({'message': 'Unauthorized'}), 401
+
+@app.route('/secure-endpoint', methods=['GET'])
+def secure_endpoint():
+    if authenticator.authenticate(request):
+        return jsonify({'message': 'You have access'}), 200
+    return jsonify({'message': 'Unauthorized'}), 401
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+### Testing
+
+#### Basic Authentication Test
+
+```python
+# tests/test_basic_auth.py
+import unittest
+from flask import Flask, request
+from flask_testing import TestCase
+from auth_strategies.basic_auth import BasicAuth
+
+class TestBasicAuth(TestCase):
+    def create_app(self):
+        app = Flask(__name__)
+        app.config['TESTING'] = True
+        self.authenticator = BasicAuth()
+        return app
+
+    def test_valid_authentication(self):
+        request.headers['Authorization'] = 'Basic dXNlcjE6cGFzc3dvcmQx'
+        self.assertTrue(self.authenticator.authenticate(request))
+
+    def test_invalid_authentication(self):
+        request.headers['Authorization'] = 'Basic invalid_credentials'
+        self.assertFalse(self.authenticator.authenticate(request))
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+Repeat similar tests for `session_auth.py`, `jwt_auth.py`, and `api_key_auth.py`.
+
+### Conclusion
+
+By following this design, you create a flexible authentication system that can easily switch between different strategies while keeping the core application logic unchanged. Each authentication strategy is encapsulated in its own class, adhering to the Strategy Design Pattern principles.

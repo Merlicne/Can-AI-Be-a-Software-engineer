@@ -1,0 +1,403 @@
+Pluggable Authentication System using Strategy Pattern in Python
+
+This project implements a flexible authentication system using the Strategy Design Pattern, enabling easy switching between different authentication mechanisms like Basic Authentication, Session-Based Authentication, JWT Authentication, and API Key Authentication.
+
+Directory Structure:
+
+authentication_system/
+├── strategies/
+│   ├── basic_auth.py
+│   ├── session_auth.py
+│   ├── jwt_auth.py
+│   └── api_key_auth.py
+├── authenticator.py
+├── utils/
+│   ├── users.py
+│   └── tokens.py
+└── main.py
+content_copy
+Use code with caution.
+
+Dependencies:
+
+requests
+jwt
+content_copy
+Use code with caution.
+Python
+
+Code:
+
+1. strategies/basic_auth.py
+
+from ..utils import users
+from ..authenticator import Authenticator
+
+class BasicAuthentication(Authenticator):
+    """
+    Basic Authentication strategy.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using Basic Authentication.
+
+        Args:
+            request: The request object.
+
+        Returns:
+            bool: True if authentication is successful, False otherwise.
+        """
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return False
+
+        auth_type, encoded_credentials = auth_header.split(' ', 1)
+        if auth_type.lower() != 'basic':
+            return False
+
+        username, password = users.decode_credentials(encoded_credentials)
+        return users.validate_credentials(username, password)
+content_copy
+Use code with caution.
+Python
+
+2. strategies/session_auth.py
+
+from ..authenticator import Authenticator
+from ..utils import users, sessions
+
+class SessionAuthentication(Authenticator):
+    """
+    Session-Based Authentication strategy.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using Session-Based Authentication.
+
+        Args:
+            request: The request object.
+
+        Returns:
+            bool: True if authentication is successful, False otherwise.
+        """
+        session_id = request.cookies.get('session_id')
+        if not session_id:
+            return False
+
+        return sessions.validate_session(session_id)
+content_copy
+Use code with caution.
+Python
+
+3. strategies/jwt_auth.py
+
+from ..authenticator import Authenticator
+from ..utils import tokens
+
+class JWTAuthentication(Authenticator):
+    """
+    JWT Authentication strategy.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using JWT Authentication.
+
+        Args:
+            request: The request object.
+
+        Returns:
+            bool: True if authentication is successful, False otherwise.
+        """
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return False
+
+        token = auth_header.split(' ', 1)[1]
+        return tokens.validate_jwt(token)
+content_copy
+Use code with caution.
+Python
+
+4. strategies/api_key_auth.py
+
+from ..authenticator import Authenticator
+from ..utils import users
+
+class APIKeyAuthentication(Authenticator):
+    """
+    API Key Authentication strategy.
+    """
+
+    def authenticate(self, request):
+        """
+        Authenticates the request using API Key Authentication.
+
+        Args:
+            request: The request object.
+
+        Returns:
+            bool: True if authentication is successful, False otherwise.
+        """
+        api_key = request.headers.get('Authorization') or request.args.get('api_key')
+        if not api_key:
+            return False
+
+        return users.validate_api_key(api_key)
+content_copy
+Use code with caution.
+Python
+
+5. authenticator.py
+
+class Authenticator:
+    """
+    Interface for Authentication strategies.
+    """
+
+    def authenticate(self, request):
+        raise NotImplementedError
+content_copy
+Use code with caution.
+Python
+
+6. utils/users.py
+
+import base64
+
+# Placeholder for user database or storage
+USERS = {
+    "user1": {"password": "password1", "api_key": "key1"},
+    "user2": {"password": "password2", "api_key": "key2"},
+}
+
+def decode_credentials(encoded_credentials):
+    """
+    Decodes Base64 encoded credentials.
+
+    Args:
+        encoded_credentials: Base64 encoded username and password.
+
+    Returns:
+        tuple: (username, password)
+    """
+    decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+    username, password = decoded_credentials.split(':', 1)
+    return username, password
+
+def validate_credentials(username, password):
+    """
+    Validates user credentials against the stored database.
+
+    Args:
+        username: The username.
+        password: The password.
+
+    Returns:
+        bool: True if credentials are valid, False otherwise.
+    """
+    user = USERS.get(username)
+    if user and user["password"] == password:
+        return True
+    return False
+
+def validate_api_key(api_key):
+    """
+    Validates the API key against the stored database.
+
+    Args:
+        api_key: The API key.
+
+    Returns:
+        bool: True if the API key is valid, False otherwise.
+    """
+    for user in USERS.values():
+        if user["api_key"] == api_key:
+            return True
+    return False
+content_copy
+Use code with caution.
+Python
+
+7. utils/tokens.py
+
+import jwt
+
+# Secret key for JWT
+SECRET_KEY = "your_secret_key"
+
+def generate_jwt(user_id):
+    """
+    Generates a JWT token for a user.
+
+    Args:
+        user_id: The user's ID.
+
+    Returns:
+        str: The JWT token.
+    """
+    payload = {
+        "user_id": user_id,
+        "exp": 3600
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+    return token
+
+def validate_jwt(token):
+    """
+    Validates a JWT token.
+
+    Args:
+        token: The JWT token.
+
+    Returns:
+        bool: True if the token is valid, False otherwise.
+    """
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return True
+    except jwt.InvalidTokenError:
+        return False
+content_copy
+Use code with caution.
+Python
+
+8. utils/sessions.py
+
+# Placeholder for session storage (memory or database)
+SESSIONS = {}
+
+def create_session(user_id):
+    """
+    Creates a new session for a user.
+
+    Args:
+        user_id: The user's ID.
+
+    Returns:
+        str: The session ID.
+    """
+    session_id = str(user_id)
+    SESSIONS[session_id] = user_id
+    return session_id
+
+def validate_session(session_id):
+    """
+    Validates the session ID against the stored sessions.
+
+    Args:
+        session_id: The session ID.
+
+    Returns:
+        bool: True if the session is valid, False otherwise.
+    """
+    return session_id in SESSIONS
+content_copy
+Use code with caution.
+Python
+
+9. main.py
+
+from strategies import BasicAuthentication, SessionAuthentication, JWTAuthentication, APIKeyAuthentication
+from authenticator import Authenticator
+
+def handle_request(request, authentication_strategy):
+    """
+    Handles a request with the specified authentication strategy.
+
+    Args:
+        request: The request object.
+        authentication_strategy: The authentication strategy to use.
+    """
+    if authentication_strategy.authenticate(request):
+        print("Authentication successful!")
+    else:
+        print("Authentication failed!")
+
+if __name__ == "__main__":
+    # Mock request object
+    class MockRequest:
+        def __init__(self, headers, cookies, args):
+            self.headers = headers
+            self.cookies = cookies
+            self.args = args
+
+    # Example usage
+    # Basic Authentication
+    basic_auth = BasicAuthentication()
+    request1 = MockRequest(
+        headers={'Authorization': 'Basic dXNlcm46cGFzc3dvcmQ='},
+        cookies={},
+        args={}
+    )
+    handle_request(request1, basic_auth)
+
+    # Session-Based Authentication
+    session_auth = SessionAuthentication()
+    request2 = MockRequest(
+        headers={},
+        cookies={'session_id': '1'},
+        args={}
+    )
+    handle_request(request2, session_auth)
+
+    # JWT Authentication
+    jwt_auth = JWTAuthentication()
+    request3 = MockRequest(
+        headers={'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJleHAiOjM2MDAwfQ.4uU49m3Qh-sT8_Z1sZ1u0vU4vYc4f_u0qQ_X12b2eQ'},
+        cookies={},
+        args={}
+    )
+    handle_request(request3, jwt_auth)
+
+    # API Key Authentication
+    api_key_auth = APIKeyAuthentication()
+    request4 = MockRequest(
+        headers={'Authorization': 'key1'},
+        cookies={},
+        args={}
+    )
+    handle_request(request4, api_key_auth)
+content_copy
+Use code with caution.
+Python
+
+Explanation:
+
+Strategy Pattern Implementation: The Authenticator interface defines a common authenticate method for each strategy. Each authentication strategy class (BasicAuthentication, SessionAuthentication, JWTAuthentication, APIKeyAuthentication) implements the authenticate method based on its respective authentication logic.
+
+Authentication Logic: Each authentication strategy class implements the specific logic for its corresponding authentication method:
+
+Basic Authentication: Decodes Base64 encoded credentials and validates against the stored user database.
+
+Session-Based Authentication: Validates the session ID against the stored sessions.
+
+JWT Authentication: Validates the JWT token by verifying its signature and expiration.
+
+API Key Authentication: Validates the API key against the stored API keys.
+
+Main Application Logic: The main.py demonstrates how to use different strategies within the application. It creates mock request objects and calls the handle_request function with the desired authentication strategy.
+
+Testing: Unit tests should be implemented to cover the validation logic of each authentication strategy, ensuring proper exception handling for invalid authentication attempts.
+
+Advantages:
+
+Flexibility: Easily switch between different authentication mechanisms without modifying core application logic.
+
+Maintainability: Authentication logic is encapsulated in separate classes, making the code easier to understand and modify.
+
+Extensibility: Easily add new authentication strategies without affecting existing code.
+
+Further Improvements:
+
+Database Integration: Implement persistent storage for user data, sessions, and API keys using a database (e.g., PostgreSQL, MySQL).
+
+Error Handling: Implement robust error handling for invalid authentication attempts and other potential issues.
+
+Security: Follow security best practices for authentication, such as using strong passwords, secure storage, and secure communication protocols.
+
+Caching: Improve performance by caching authentication results for frequently used users or keys.
+
+This project provides a solid foundation for a flexible and secure authentication system in Python. Remember to customize it further based on your specific application requirements.
