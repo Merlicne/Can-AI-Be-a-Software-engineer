@@ -1,0 +1,192 @@
+package com.authentication;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class BasicAuthenticatorTest {
+
+    @Test
+    void testAuthenticateSuccess() throws AuthenticationException {
+        Request request = new Request();
+        request.addHeader("Authorization", "Basic dXNlcjE6cGFzczE="); 
+        BasicAuthenticator authenticator = new BasicAuthenticator();
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateInvalidCredentials() {
+        Request request = new Request();
+        request.addHeader("Authorization", "Basic invalid");
+        BasicAuthenticator authenticator = new BasicAuthenticator();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMissingHeader() {
+        Request request = new Request();
+        BasicAuthenticator authenticator = new BasicAuthenticator();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateInvalidHeaderFormat() {
+        Request request = new Request();
+        request.addHeader("Authorization", "Basic"); 
+        BasicAuthenticator authenticator = new BasicAuthenticator();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateWrongPassword() {
+        Request request = new Request();
+        request.addHeader("Authorization", "Basic dXNlcjE6cGFzczI="); 
+        BasicAuthenticator authenticator = new BasicAuthenticator();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+package com.authentication;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class SessionAuthenticatorTest {
+
+    @Test
+    void testSessionAuthenticator() throws AuthenticationException {
+        SessionAuthenticator authenticator = new SessionAuthenticator();
+        User user = new User("testUser");
+        String sessionId = authenticator.createSession(user);
+
+        Request request = new Request();
+        request.addCookie("session-id", sessionId);
+
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testSessionAuthenticatorInvalidSession() {
+        SessionAuthenticator authenticator = new SessionAuthenticator();
+        Request request = new Request();
+        request.addCookie("session-id", "invalid-session");
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testSessionAuthenticatorMissingSession() {
+        SessionAuthenticator authenticator = new SessionAuthenticator();
+        Request request = new Request();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+package com.authentication;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class JWTAuthenticatorTest {
+
+    private static final String SECRET_KEY = "your_secret_key"; // Replace with a strong secret key
+
+    @Test
+    void testJWTAuthentication() throws AuthenticationException {
+        JWTAuthenticator authenticator = new JWTAuthenticator();
+        User user = new User("testUser");
+        String token = authenticator.generateToken(user);
+
+        Request request = new Request();
+        request.addHeader("Authorization", "Bearer " + token);
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testJWTAuthenticationInvalidToken() {
+        JWTAuthenticator authenticator = new JWTAuthenticator();
+        Request request = new Request();
+        request.addHeader("Authorization", "Bearer invalid-token");
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testJWTAuthenticationMissingHeader() {
+        JWTAuthenticator authenticator = new JWTAuthenticator();
+        Request request = new Request();
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+package com.authentication;
+
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class APIKeyAuthenticatorTest {
+
+    @Test
+    void testAuthenticateValidKey() throws AuthenticationException {
+        APIKeyAuthenticator authenticator = new APIKeyAuthenticator();
+        Request request = new Request();
+        request.addHeader("Authorization", "api_key_1");
+
+        assertTrue(authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateValidKeyAsParameter() throws AuthenticationException {
+        APIKeyAuthenticator authenticator = new APIKeyAuthenticator();
+        Request request = new Request();
+        request.addParameter("api_key", "api_key_1");
+
+        assertTrue(authenticator.authenticate(request));
+    }
+
+
+    @Test
+    void testAuthenticateInvalidKey() {
+        APIKeyAuthenticator authenticator = new APIKeyAuthenticator();
+        Request request = new Request();
+        request.addHeader("Authorization", "invalid_api_key");
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticateMissingKey() {
+        APIKeyAuthenticator authenticator = new APIKeyAuthenticator();
+        Request request = new Request();
+
+        assertThrows(AuthenticationException.class, () -> authenticator.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+Explanation of Test Cases:
+
+BasicAuthenticatorTest: Tests for valid and invalid Basic Authentication headers, missing headers, incorrect credentials and wrong passwords.
+
+SessionAuthenticatorTest: Tests for valid session IDs, invalid session IDs, and missing session IDs.
+
+JWTAuthenticatorTest: Tests for valid JWT tokens, invalid JWT tokens, and missing Authorization headers.
+
+APIKeyAuthenticatorTest: Tests for valid API keys in header and as parameter, invalid API keys, and missing API keys.
+
+Key Points:
+
+Each test method focuses on a specific authentication scenario.
+
+Assertions (using assertTrue, assertFalse, assertThrows) are used to verify expected outcomes.
+
+The tests cover different branches of the code (e.g., checking for null values, different header formats, successful and unsuccessful authentication).
+
+By running these tests, you can ensure that your authentication strategies are implemented correctly and handle various situations as expected.
+
+Remember to configure your testing environment (e.g., add JUnit to your project) to run these tests.

@@ -1,0 +1,51 @@
+Pluggable Authentication System with Strategy Pattern
+
+This document details the implementation of a pluggable authentication system using the Strategy design pattern in Java. It allows for easy switching between various authentication mechanisms: Basic, Session-Based, JWT, and API Key.
+
+Project Structure:
+
+auth-system/
+├── src/main/java/com/example/authsystem/
+│   ├── authentication/
+│   │   ├── BasicAuthentication.java
+│   │   ├── SessionAuthentication.java
+│   │   ├── JwtAuthentication.java
+│   │   ├── ApiKeyAuthentication.java
+│   │   └── Authenticator.java
+│   ├── config/
+│   │   └── AuthenticationConfig.java
+│   ├── controllers/
+│   │   └── AuthController.java
+│   ├── services/
+│   │   └── AuthenticationService.java
+│   ├── models/
+│   │   ├── User.java
+│   │   ├── JwtToken.java
+│   │   └── ApiKey.java
+│   ├── utils/
+│   │   └── JwtUtils.java
+│   └── Application.java
+├── src/test/java/com/example/authsystem/
+│   └── authentication/
+│       ├── BasicAuthenticationTest.java
+│       ├── SessionAuthenticationTest.java
+│       ├── JwtAuthenticationTest.java
+│       └── ApiKeyAuthenticationTest.java
+└── pom.xml
+content_copy
+Use code with caution.
+
+Dependencies:
+
+<dependencies>
+  <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-api</artifactId>
+    <
+content_copy
+Use code with caution.
+Xml

@@ -1,0 +1,584 @@
+Pluggable Authentication System with Strategy Pattern
+
+This document outlines a pluggable authentication system using the Strategy Pattern in Java, providing the following functionalities:
+
+Basic Authentication: Username/password authentication using HTTP Authorization header.
+
+Session-Based Authentication: Server-side session management using cookies.
+
+JWT (JSON Web Token) Authentication: Stateless authentication with signed JWT tokens.
+
+API Key Authentication: Unique API keys for each user.
+
+Directory Structure:
+
+├── src
+│   └── main
+│       └── java
+│           └── com
+│               └── example
+│                   ├── authentication
+│                   │   ├── APIKeyAuthenticationStrategy.java
+│                   │   ├── BasicAuthenticationStrategy.java
+│                   │   ├── JWTAuthenticationStrategy.java
+│                   │   ├── SessionAuthenticationStrategy.java
+│                   │   └── Authenticator.java
+│                   ├── config
+│                   │   └── AuthenticationConfig.java
+│                   ├── model
+│                   │   ├── User.java
+│                   │   └── UserCredentials.java
+│                   ├── service
+│                   │   ├── AuthenticationService.java
+│                   │   └── UserService.java
+│                   └── App.java
+├── test
+│   └── java
+│       └── com
+│           └── example
+│               └── authentication
+│                   ├── APIKeyAuthenticationStrategyTest.java
+│                   ├── BasicAuthenticationStrategyTest.java
+│                   ├── JWTAuthenticationStrategyTest.java
+│                   ├── SessionAuthenticationStrategyTest.java
+│                   └── AuthenticationServiceTest.java
+└── pom.xml
+content_copy
+Use code with caution.
+
+Dependencies:
+
+JWT library: com.auth0:java-jwt (for JWT authentication)
+
+Junit: junit:junit
+
+Mockito: org.mockito:mockito-core (for unit testing)
+
+Code Implementation:
+
+1. Authentication Interface:
+
+package com.example.authentication;
+
+import javax.servlet.http.HttpServletRequest;
+
+public interface Authenticator {
+
+    boolean authenticate(HttpServletRequest request);
+
+    // Additional methods if necessary for each authentication strategy
+}
+content_copy
+Use code with caution.
+Java
+
+2. Authentication Strategies:
+
+2.1. Basic Authentication Strategy:
+
+package com.example.authentication;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Base64;
+import java.util.Map;
+
+public class BasicAuthenticationStrategy implements Authenticator {
+
+    private Map<String, String> users;
+
+    public BasicAuthenticationStrategy(Map<String, String> users) {
+        this.users = users;
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader != null && authorizationHeader.startsWith("Basic ")) {
+            String encodedCredentials = authorizationHeader.substring("Basic ".length()).trim();
+            String decodedCredentials = new String(Base64.getDecoder().decode(encodedCredentials));
+            String[] credentials = decodedCredentials.split(":");
+            if (credentials.length == 2) {
+                String username = credentials[0];
+                String password = credentials[1];
+                return users.containsKey(username) && users.get(username).equals(password);
+            }
+        }
+        return false;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+2.2. Session-Based Authentication Strategy:
+
+package com.example.authentication;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
+
+public class SessionAuthenticationStrategy implements Authenticator {
+
+    private Map<String, String> sessions;
+
+    public SessionAuthenticationStrategy(Map<String, String> sessions) {
+        this.sessions = sessions;
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String sessionId = request.getCookie("sessionId");
+        if (sessionId != null) {
+            return sessions.containsKey(sessionId);
+        }
+        return false;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+2.3. JWT Authentication Strategy:
+
+package com.example.authentication;
+
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.exceptions.JWTVerificationException;
+import com.auth0.jwt.interfaces.DecodedJWT;
+import javax.servlet.http.HttpServletRequest;
+
+public class JWTAuthenticationStrategy implements Authenticator {
+
+    private String secretKey;
+
+    public JWTAuthenticationStrategy(String secretKey) {
+        this.secretKey = secretKey;
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring("Bearer ".length()).trim();
+            try {
+                Algorithm algorithm = Algorithm.HMAC256(secretKey);
+                JWTVerifier verifier = JWT.require(algorithm).build();
+                DecodedJWT jwt = verifier.verify(token);
+                return true;
+            } catch (JWTVerificationException exception) {
+                return false;
+            }
+        }
+        return false;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+2.4. API Key Authentication Strategy:
+
+package com.example.authentication;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Map;
+
+public class APIKeyAuthenticationStrategy implements Authenticator {
+
+    private Map<String, String> apiKeyMap;
+
+    public APIKeyAuthenticationStrategy(Map<String, String> apiKeyMap) {
+        this.apiKeyMap = apiKeyMap;
+    }
+
+    @Override
+    public boolean authenticate(HttpServletRequest request) {
+        String apiKey = request.getHeader("Authorization");
+        if (apiKey == null) {
+            apiKey = request.getParameter("apiKey");
+        }
+        if (apiKey != null) {
+            return apiKeyMap.containsKey(apiKey);
+        }
+        return false;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+3. Authentication Service:
+
+package com.example.service;
+
+import com.example.authentication.Authenticator;
+import javax.servlet.http.HttpServletRequest;
+
+public class AuthenticationService {
+
+    private Authenticator authenticator;
+
+    public AuthenticationService(Authenticator authenticator) {
+        this.authenticator = authenticator;
+    }
+
+    public boolean isAuthenticated(HttpServletRequest request) {
+        return authenticator.authenticate(request);
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+4. Configuration:
+
+package com.example.config;
+
+import com.example.authentication.APIKeyAuthenticationStrategy;
+import com.example.authentication.BasicAuthenticationStrategy;
+import com.example.authentication.JWTAuthenticationStrategy;
+import com.example.authentication.SessionAuthenticationStrategy;
+import com.example.authentication.Authenticator;
+import com.example.service.AuthenticationService;
+import java.util.HashMap;
+import java.util.Map;
+
+public class AuthenticationConfig {
+
+    public AuthenticationService getAuthenticationService() {
+        // Example configuration for different authentication strategies
+        Authenticator authenticator = getAuthenticator();
+        return new AuthenticationService(authenticator);
+    }
+
+    private Authenticator getAuthenticator() {
+        // Choose your desired authentication strategy
+        // Here, Basic Authentication strategy is used by default
+        return new BasicAuthenticationStrategy(getUserCredentials());
+        //return new SessionAuthenticationStrategy(getSessionMap());
+        //return new JWTAuthenticationStrategy("your-secret-key");
+        //return new APIKeyAuthenticationStrategy(getApiKeyMap());
+    }
+
+    private Map<String, String> getUserCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        users.put("user2", "password2");
+        return users;
+    }
+
+    private Map<String, String> getSessionMap() {
+        Map<String, String> sessions = new HashMap<>();
+        // Store session IDs on the server side
+        return sessions;
+    }
+
+    private Map<String, String> getApiKeyMap() {
+        Map<String, String> apiKeys = new HashMap<>();
+        // Store API keys in the database or memory
+        return apiKeys;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+5. App Class (Example Usage):
+
+package com.example;
+
+import com.example.config.AuthenticationConfig;
+import com.example.service.AuthenticationService;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+public class App {
+
+    public static void main(String[] args) {
+        AuthenticationConfig config = new AuthenticationConfig();
+        AuthenticationService authenticationService = config.getAuthenticationService();
+        HttpServletRequest request = null; // Assuming request is available
+        HttpServletResponse response = null; // Assuming response is available
+
+        if (authenticationService.isAuthenticated(request)) {
+            // Authorized access
+            System.out.println("User is authenticated!");
+            // Perform actions based on the authenticated user
+        } else {
+            // Unauthorized access
+            System.out.println("User is not authenticated!");
+            // Handle unauthorized access
+        }
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6. Unit Tests:
+
+6.1. Basic Authentication Strategy Test:
+
+package com.example.authentication;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class BasicAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " +  Base64.getEncoder().encodeToString("user1:password1".getBytes()));
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidCredentials() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Basic " +  Base64.getEncoder().encodeToString("user1:password2".getBytes()));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingAuthorizationHeader() {
+        Map<String, String> users = new HashMap<>();
+        users.put("user1", "password1");
+        BasicAuthenticationStrategy strategy = new BasicAuthenticationStrategy(users);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6.2. Session-Based Authentication Strategy Test:
+
+package com.example.authentication;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class SessionAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(new Cookie[] {new Cookie("sessionId", "sessionId1")});
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidSession() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(new Cookie[] {new Cookie("sessionId", "sessionId2")});
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingSessionCookie() {
+        Map<String, String> sessions = new HashMap<>();
+        sessions.put("sessionId1", "user1");
+        SessionAuthenticationStrategy strategy = new SessionAuthenticationStrategy(sessions);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getCookies()).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6.3. JWT Authentication Strategy Test:
+
+package com.example.authentication;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.HttpServletRequest;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class JWTAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidToken() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + JWT.create().withIssuer("your-issuer").sign(Algorithm.HMAC256("your-secret-key")));
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidToken() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("Bearer " + JWT.create().withIssuer("your-issuer").sign(Algorithm.HMAC256("wrong-secret-key")));
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingAuthorizationHeader() {
+        JWTAuthenticationStrategy strategy = new JWTAuthenticationStrategy("your-secret-key");
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6.4. API Key Authentication Strategy Test:
+
+package com.example.authentication;
+
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class APIKeyAuthenticationStrategyTest {
+
+    @Test
+    void testAuthenticate_ValidApiKey_Header() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("apiKey1");
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_ValidApiKey_QueryParameter() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getParameter("apiKey")).thenReturn("apiKey1");
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+
+        assertTrue(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_InvalidApiKey() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn("apiKey2");
+
+        assertFalse(strategy.authenticate(request));
+    }
+
+    @Test
+    void testAuthenticate_MissingApiKey() {
+        Map<String, String> apiKeys = new HashMap<>();
+        apiKeys.put("apiKey1", "user1");
+        APIKeyAuthenticationStrategy strategy = new APIKeyAuthenticationStrategy(apiKeys);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+        Mockito.when(request.getHeader("Authorization")).thenReturn(null);
+        Mockito.when(request.getParameter("apiKey")).thenReturn(null);
+
+        assertFalse(strategy.authenticate(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6.5. Authentication Service Test:
+
+package com.example.authentication;
+
+import com.example.service.AuthenticationService;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import javax.servlet.http.HttpServletRequest;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class AuthenticationServiceTest {
+
+    @Test
+    void testIsAuthenticated_Success() {
+        Authenticator authenticator = Mockito.mock(Authenticator.class);
+        Mockito.when(authenticator.authenticate(Mockito.any(HttpServletRequest.class))).thenReturn(true);
+        AuthenticationService service = new AuthenticationService(authenticator);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+
+        assertTrue(service.isAuthenticated(request));
+    }
+
+    @Test
+    void testIsAuthenticated_Failure() {
+        Authenticator authenticator = Mockito.mock(Authenticator.class);
+        Mockito.when(authenticator.authenticate(Mockito.any(HttpServletRequest.class))).thenReturn(false);
+        AuthenticationService service = new AuthenticationService(authenticator);
+
+        HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+
+        assertFalse(service.isAuthenticated(request));
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+This implementation provides a solid foundation for a pluggable authentication system in Java using the Strategy Pattern. You can choose the desired authentication strategy based on your application's requirements and easily switch between them without modifying the core logic. The unit tests ensure the correctness and reliability of each authentication strategy.

@@ -1,0 +1,303 @@
+Pluggable Authentication System in Java using Strategy Pattern
+
+This document describes the implementation of a pluggable authentication system in Java using the Strategy Design Pattern. The system supports switching between Basic, Session-Based, JWT, and API Key authentication mechanisms without modifying the core application logic.
+
+Directory Structure:
+src
+├── main
+│   └── java
+│       └── com
+│           └── authsystem
+│               ├── App.java                    // Main Application class
+│               ├── auth
+│               │   ├── AuthenticationStrategy.java   // Interface for authentication strategies
+│               │   ├── BasicAuthenticator.java        // Basic Authentication strategy
+│               │   ├── SessionAuthenticator.java     // Session-Based Authentication strategy
+│               │   ├── JWTAuthenticator.java          // JWT Authentication strategy
+│               │   └── APIKeyAuthenticator.java       // API Key Authentication strategy
+│               ├── session
+│               │   └── SessionManager.java            // Session Management (For Session-Based Auth)
+│               ├── token
+│               │   └── JWTUtil.java                  // JWT Token generation and validation
+│               └── user
+│                   └── User.java                      // User class representing authenticated user
+├── test
+│   └── java
+│       └── com
+│           └── authsystem
+│               ├── auth
+│               │   ├── BasicAuthenticatorTest.java     // Test for BasicAuthenticator
+│               │   ├── SessionAuthenticatorTest.java    // Test for SessionAuthenticator
+│               │   ├── JWTAuthenticatorTest.java         // Test for JWTAuthenticator
+│               │   └── APIKeyAuthenticatorTest.java      // Test for APIKeyAuthenticator
+│               └── token
+│                   └── JWTUtilTest.java                 // Test for JWTUtil
+└── pom.xml                                         // Maven project file
+content_copy
+Use code with caution.
+Dependencies:
+
+JWT: io.jsonwebtoken:jjwt-api:0.11.2 and io.jsonwebtoken:jjwt-impl:0.11.2 (or a similar JWT library)
+
+Servlet API: javax.servlet:javax.servlet-api:4.0.1 (for Session Management)
+
+JUnit: junit:junit:4.13.2 (for testing)
+
+Code Implementation:
+
+1. AuthenticationStrategy Interface (src/main/java/com/authsystem/auth/AuthenticationStrategy.java):
+
+package com.authsystem.auth;
+
+import com.authsystem.user.User;
+
+public interface AuthenticationStrategy {
+    User authenticate(Request request) throws AuthenticationException;
+}
+content_copy
+Use code with caution.
+Java
+
+2. BasicAuthenticator (src/main/java/com/authsystem/auth/BasicAuthenticator.java):
+
+package com.authsystem.auth;
+
+import com.authsystem.user.User;
+import com.authsystem.user.UserService;
+import org.apache.commons.codec.binary.Base64;
+
+public class BasicAuthenticator implements AuthenticationStrategy {
+
+    private final UserService userService;
+
+    public BasicAuthenticator(UserService userService) {
+        this.userService = userService;
+    }
+
+    @Override
+    public User authenticate(Request request) throws AuthenticationException {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Basic ")) {
+            throw new AuthenticationException("Missing or invalid Authorization header");
+        }
+
+        String encodedCredentials = authHeader.substring("Basic ".length()).trim();
+        String credentials = new String(Base64.decodeBase64(encodedCredentials));
+        String[] parts = credentials.split(":");
+        if (parts.length != 2) {
+            throw new AuthenticationException("Invalid Basic Authentication credentials");
+        }
+
+        String username = parts[0];
+        String password = parts[1];
+
+        User user = userService.findByUsername(username);
+        if (user == null || !user.getPassword().equals(password)) {
+            throw new AuthenticationException("Invalid username or password");
+        }
+
+        return user;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+3. SessionAuthenticator (src/main/java/com/authsystem/auth/SessionAuthenticator.java):
+
+package com.authsystem.auth;
+
+import com.authsystem.session.SessionManager;
+import com.authsystem.user.User;
+
+public class SessionAuthenticator implements AuthenticationStrategy {
+
+    private final SessionManager sessionManager;
+
+    public SessionAuthenticator(SessionManager sessionManager) {
+        this.sessionManager = sessionManager;
+    }
+
+    @Override
+    public User authenticate(Request request) throws AuthenticationException {
+        String sessionId = request.getCookie("sessionId");
+        if (sessionId == null) {
+            throw new AuthenticationException("Missing session cookie");
+        }
+
+        User user = sessionManager.getUserBySessionId(sessionId);
+        if (user == null) {
+            throw new AuthenticationException("Invalid session ID");
+        }
+
+        return user;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+4. JWTAuthenticator (src/main/java/com/authsystem/auth/JWTAuthenticator.java):
+
+package com.authsystem.auth;
+
+import com.authsystem.token.JWTUtil;
+import com.authsystem.user.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+
+public class JWTAuthenticator implements AuthenticationStrategy {
+
+    private final JWTUtil jwtUtil;
+
+    public JWTAuthenticator(JWTUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+
+    @Override
+    public User authenticate(Request request) throws AuthenticationException {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new AuthenticationException("Missing or invalid Authorization header");
+        }
+
+        String token = authHeader.substring("Bearer ".length()).trim();
+
+        try {
+            Claims claims = jwtUtil.parseToken(token);
+            String username = claims.getSubject();
+            // Retrieve user details from database using the username
+            // ...
+            return user;
+
+        } catch (ExpiredJwtException e) {
+            throw new AuthenticationException("JWT token expired", e);
+        } catch (JwtException e) {
+            throw new AuthenticationException("Invalid JWT token", e);
+        }
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+5. APIKeyAuthenticator (src/main/java/com/authsystem/auth/APIKeyAuthenticator.java):
+
+package com.authsystem.auth;
+
+import com.authsystem.user.User;
+import com.authsystem.user.UserService;
+
+public class APIKeyAuthenticator implements AuthenticationStrategy {
+
+    private final UserService userService;
+
+    public APIKeyAuthenticator(UserService userService) {
+        this.userService = userService;
+    }
+
+    @Override
+    public User authenticate(Request request) throws AuthenticationException {
+        String apiKey = request.getHeader("X-API-Key");
+        if (apiKey == null) {
+            apiKey = request.getParameter("apiKey");
+        }
+
+        if (apiKey == null) {
+            throw new AuthenticationException("Missing API key");
+        }
+
+        User user = userService.findByApiKey(apiKey);
+        if (user == null) {
+            throw new AuthenticationException("Invalid API key");
+        }
+
+        return user;
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+6. JWTUtil (src/main/java/com/authsystem/token/JWTUtil.java):
+
+package com.authsystem.token;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+
+import java.util.Date;
+
+public class JWTUtil {
+    // ... Secret key management ...
+
+    public String generateToken(User user) {
+        return Jwts.builder()
+                .setSubject(user.getUsername())
+                // ... Add additional claims if needed ...
+                .setExpiration(new Date(System.currentTimeMillis() + JWT_EXPIRATION_TIME))
+                .signWith(SignatureAlgorithm.HS512, SECRET_KEY)
+                .compact();
+    }
+
+    public Claims parseToken(String token) {
+        return Jwts.parser()
+                .setSigningKey(SECRET_KEY)
+                .parseClaimsJws(token)
+                .getBody();
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+7. App.java (src/main/java/com/authsystem/App.java):
+
+package com.authsystem;
+
+import com.authsystem.auth.*;
+import com.authsystem.session.SessionManager;
+import com.authsystem.token.JWTUtil;
+import com.authsystem.user.User;
+import com.authsystem.user.UserService;
+
+public class App {
+
+    public static void main(String[] args) {
+        // ... Initialize dependencies ...
+        UserService userService = new UserService();
+        SessionManager sessionManager = new SessionManager();
+        JWTUtil jwtUtil = new JWTUtil();
+
+        AuthenticationStrategy authStrategy = null;
+
+        // ... Determine authentication strategy based on configuration or request ...
+        if (useBasicAuth) {
+            authStrategy = new BasicAuthenticator(userService);
+        } else if (useSessionAuth) {
+            authStrategy = new SessionAuthenticator(sessionManager);
+        } else if (useJWTAuth) {
+            authStrategy = new JWTAuthenticator(jwtUtil);
+        } else if (useAPIKeyAuth) {
+            authStrategy = new APIKeyAuthenticator(userService);
+        } else {
+            throw new IllegalArgumentException("No authentication strategy selected");
+        }
+
+        // ... Handle request and authentication ...
+        try {
+            Request request = new Request(); // Simulated request object
+            User user = authStrategy.authenticate(request);
+            // ... Proceed with authorized access ...
+        } catch (AuthenticationException e) {
+            // ... Handle authentication failure ...
+        }
+    }
+}
+content_copy
+Use code with caution.
+Java
+
+This code provides a basic structure and implementation of the pluggable authentication system. Remember to replace placeholders with your implementation and adjust it to your specific project needs. Ensure to implement the remaining classes like Request, UserService, SessionManager, and handle error cases appropriately. Also, implement unit tests for each authentication strategy to ensure they are functioning correctly.
