@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 class Product:
     """Represents a product in the database."""
@@ -18,74 +18,97 @@ class DatabaseProxy:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._conn = None
+        self.connect()
+        self.initialize_database()  # Create table if it does not exist
 
-    def __enter__(self):
+    def connect(self):
+        """Establish a connection to the database."""
         self._conn = sqlite3.connect(self.db_path)
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def close(self):
+        """Close the database connection."""
         if self._conn:
             self._conn.commit()
             self._conn.close()
+            self._conn = None
+
+    def __enter__(self):
+        if not self._conn:
+            self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def initialize_database(self):
+        """Create the products table if it does not exist."""
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            price REAL NOT NULL
+        );
+        """
+        try:
+            cursor = self._conn.cursor()
+            cursor.execute(create_table_query)
+            self._conn.commit()
+        except Exception as e:
+            raise Exception(f"Error initializing database: {e}")
 
     def create_product(self, product: Product) -> int:
         """Creates a new product in the database."""
         try:
-            with self._conn:
-                cursor = self._conn.cursor()
-                cursor.execute(
-                    "INSERT INTO products (name, price) VALUES (?, ?)",
-                    (product.name, product.price),
-                )
-                return cursor.lastrowid
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "INSERT INTO products (name, price) VALUES (?, ?)",
+                (product.name, product.price),
+            )
+            return cursor.lastrowid
         except Exception as e:
             raise Exception(f"Error creating product: {e}")
 
     def get_product(self, product_id: int) -> Optional[Product]:
         """Retrieves a product by its ID."""
         try:
-            with self._conn:
-                cursor = self._conn.cursor()
-                cursor.execute(
-                    "SELECT id, name, price FROM products WHERE id = ?", (product_id,)
-                )
-                row = cursor.fetchone()
-                if row:
-                    return Product(row[0], row[1], row[2])
-                else:
-                    return None
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "SELECT id, name, price FROM products WHERE id = ?", (product_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return Product(row[0], row[1], row[2])
+            else:
+                return None
         except Exception as e:
             raise Exception(f"Error getting product: {e}")
 
     def get_products(self) -> List[Product]:
         """Retrieves all products from the database."""
         try:
-            with self._conn:
-                cursor = self._conn.cursor()
-                cursor.execute("SELECT id, name, price FROM products")
-                rows = cursor.fetchall()
-                return [Product(row[0], row[1], row[2]) for row in rows]
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT id, name, price FROM products")
+            rows = cursor.fetchall()
+            return [Product(row[0], row[1], row[2]) for row in rows]
         except Exception as e:
             raise Exception(f"Error getting products: {e}")
 
     def update_product(self, product: Product) -> None:
         """Updates an existing product in the database."""
         try:
-            with self._conn:
-                cursor = self._conn.cursor()
-                cursor.execute(
-                    "UPDATE products SET name = ?, price = ? WHERE id = ?",
-                    (product.name, product.price, product.id),
-                )
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "UPDATE products SET name = ?, price = ? WHERE id = ?",
+                (product.name, product.price, product.id),
+            )
         except Exception as e:
             raise Exception(f"Error updating product: {e}")
 
     def delete_product(self, product_id: int) -> None:
         """Deletes a product from the database."""
         try:
-            with self._conn:
-                cursor = self._conn.cursor()
-                cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+            cursor = self._conn.cursor()
+            cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
         except Exception as e:
             raise Exception(f"Error deleting product: {e}")
 

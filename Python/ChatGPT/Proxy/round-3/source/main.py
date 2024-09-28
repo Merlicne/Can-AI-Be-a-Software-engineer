@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+from flask import Flask, request, jsonify
 
 class DatabaseProxy:
     def __init__(self, database_manager):
@@ -60,16 +61,12 @@ class DatabaseManager:
             return cursor.fetchone()
 
 
-from flask import Flask, request, jsonify
-
 app = Flask(__name__)
 
 # Initialize the DatabaseManager and Proxy
 db_manager = DatabaseManager()
 db_proxy = DatabaseProxy(db_manager)
 
-# Create a table
-@app.before_first_request
 def create_table():
     create_table_query = """
     CREATE TABLE IF NOT EXISTS records (
@@ -79,6 +76,9 @@ def create_table():
     );
     """
     db_proxy.execute(create_table_query)
+
+# Call create_table explicitly before starting the app
+create_table()
 
 # POST /create
 @app.route('/create', methods=['POST'])

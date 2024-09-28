@@ -50,6 +50,21 @@ class BookAPI:
     def __init__(self, db_proxy):
         self.db_proxy = db_proxy
 
+    def create_books_table(self):
+        """
+        Creates the books table if it does not exist.
+        """
+        query = """
+        CREATE TABLE IF NOT EXISTS books (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            author TEXT NOT NULL,
+            isbn TEXT UNIQUE NOT NULL
+        )
+        """
+        self.db_proxy.execute_query(query)
+        print("Books table created successfully.")
+
     def create_book(self, title, author, isbn):
         """
         Creates a new book entry in the database.
@@ -104,6 +119,7 @@ if __name__ == "__main__":
     book_api = BookAPI(db_proxy) # Inject the Proxy into the API
 
     with db_proxy: # Connect to the database using the Proxy
+        book_api.create_books_table() # Create the table if it does not exist
         book_api.create_book("The Hitchhiker's Guide to the Galaxy", "Douglas Adams", "978-0345391803")
         book_api.get_book("978-0345391803")
         book_api.update_book("978-0345391803", author="Douglas Noel Adams")

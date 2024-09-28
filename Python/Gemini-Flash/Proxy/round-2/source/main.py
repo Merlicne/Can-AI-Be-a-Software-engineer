@@ -15,19 +15,29 @@ class DatabaseProxy:
         """
         Establishes a connection to the SQLite database.
         """
-        self.conn = sqlite3.connect(self.db_file)
+        if not self.conn:
+            print("Connecting to database...")
+            self.conn = sqlite3.connect(self.db_file)
+            self.conn.row_factory = sqlite3.Row  # Enable dictionary-like row access
+        else:
+            print("Already connected to database.")
 
     def close(self):
         """
         Closes the database connection.
         """
         if self.conn:
+            print("Closing database connection...")
             self.conn.close()
+            self.conn = None
+        else:
+            print("Connection already closed.")
 
     def execute(self, query: str, params: tuple = None) -> List[Dict]:
         """
         Executes a SQL query and returns the result as a list of dictionaries.
         """
+        self.connect()  # Ensure connection is open
         cursor = self.conn.cursor()
         try:
             if params:
@@ -43,10 +53,12 @@ class DatabaseProxy:
             cursor.close()
 
     def __enter__(self):
+        print("Entering context: opening connection.")
         self.connect()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        print("Exiting context: closing connection.")
         self.close()
 
 
@@ -83,8 +95,10 @@ class ProductAPI:
                     product_data['price'],
                     product_data['quantity'],
                 )
-                db.execute(query, params)
-                product_data['id'] = db.conn.lastrowid
+                cursor = db.conn.cursor()
+                cursor.execute(query, params)
+                db.conn.commit()
+                product_data['id'] = cursor.lastrowid  # Accessing lastrowid from the cursor
                 return product_data
             except Exception as e:
                 raise Exception("Failed to create product: {}".format(e))
@@ -147,22 +161,33 @@ class ProductAPI:
         """
         with self.db_proxy as db:
             try:
+                existing_product = self.get_product(product_id)
+                if not existing_product:
+                    return None
+
+                updated_data = {
+                    'name': product_data.get('name', existing_product['name']),
+                    'description': product_data.get('description', existing_product['description']),
+                    'price': product_data.get('price', existing_product['price']),
+                    'quantity': product_data.get('quantity', existing_product['quantity']),
+                }
+
                 query = """
                     UPDATE products
                     SET name = ?, description = ?, price = ?, quantity = ?
                     WHERE id = ?
                 """
                 params = (
-                    product_data['name'],
-                    product_data['description'],
-                    product_data['price'],
-                    product_data['quantity'],
+                    updated_data['name'],
+                    updated_data['description'],
+                    updated_data['price'],
+                    updated_data['quantity'],
                     product_id,
                 )
                 db.execute(query, params)
-                return product_data
+                return updated_data
             except Exception as e:
-                raise Exception("Failed to update product: {}".format(e))
+                raise Exception(f"Failed to update product: {e}")
 
     def delete_product(self, product_id: int) -> bool:
         """
