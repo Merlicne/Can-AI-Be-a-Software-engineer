@@ -1,7 +1,11 @@
 import pytest
 import sqlite3
 from flask import Flask, request, jsonify
-from your_module import app, DatabaseProxy, DatabaseManager  # Adjust import as necessary
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+from main import app, DatabaseProxy, DatabaseManager  # Adjust import as necessary
 
 # Setup a test database
 @pytest.fixture(scope='module')

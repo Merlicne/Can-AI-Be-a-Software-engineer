@@ -1,5 +1,9 @@
 import pytest
 from unittest.mock import MagicMock
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
 from database_proxy import DatabaseProxy
 from database_manager import DatabaseManager
 

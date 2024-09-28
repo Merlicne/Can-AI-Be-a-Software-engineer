@@ -1,7 +1,13 @@
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
-from api_code import app, db_manager, db_proxy  # Assuming the previous code is in `api_code.py`
+
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import app, db_manager, db_proxy  # Assuming the previous code is in `api_code.py`
 
 @pytest.fixture
 def client():

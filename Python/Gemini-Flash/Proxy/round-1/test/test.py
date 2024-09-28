@@ -2,7 +2,12 @@ import unittest
 import sqlite3
 from unittest.mock import patch, MagicMock
 
-from crud_api_proxy import Product, DatabaseProxy, ProductAPI
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import Product, DatabaseProxy, ProductAPI
 
 class TestProductAPI(unittest.TestCase):
 

@@ -3,8 +3,12 @@ import sqlite3
 from flask import Flask, jsonify, request
 
 # Assuming the code for DatabaseProxy, DatabaseManager, and Flask app is saved in `app.py`
+import os
+import sys
 
-from app import app, DatabaseProxy
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import app, DatabaseProxy
 
 @pytest.fixture
 def client():

@@ -1,5 +1,11 @@
 import pytest
-from app import app, db_manager, db_proxy
+
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import app, db_manager, db_proxy
 
 @pytest.fixture
 def client():

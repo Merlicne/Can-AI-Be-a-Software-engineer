@@ -1,6 +1,11 @@
 import sqlite3
 import pytest
-from your_module import BookAPI, DatabaseProxy  # Replace your_module
+
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+from main import BookAPI, DatabaseProxy  # Replace your_module
 
 
 @pytest.fixture(scope="function")

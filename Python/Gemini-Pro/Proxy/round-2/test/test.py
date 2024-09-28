@@ -1,6 +1,12 @@
 import pytest
 import sqlite3
-from your_module import BookAPI, DatabaseProxy  # Replace 'your_module' with the actual module name
+
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import BookAPI, DatabaseProxy  # Replace 'your_module' with the actual module name
 
 @pytest.fixture
 def db_file():

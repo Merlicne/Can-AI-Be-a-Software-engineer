@@ -3,7 +3,12 @@ import sqlite3
 import os
 from unittest.mock import patch, MagicMock
 
-from your_module import DatabaseProxy, ProductAPI  # Replace "your_module" with the actual module name
+import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../source')))
+
+from main import DatabaseProxy, ProductAPI  # Replace "your_module" with the actual module name
 
 
 class TestDatabaseProxy(unittest.TestCase):
