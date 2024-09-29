@@ -1,2 +1,4 @@
-
+qodana.yaml
+qodana.sarif.json
 .env
+.idea

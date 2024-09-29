@@ -1,6 +1,5 @@
 package com.example.demo;
 
-import com.example.demo.controller.RecordController;
 import com.example.demo.entity.Record;
 import com.example.demo.proxy.DatabaseManager;
 import com.example.demo.proxy.DatabaseProxy;
@@ -17,7 +16,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
